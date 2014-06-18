@@ -31,6 +31,7 @@
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="YamlParser.cs" />
+    <Compile Include="YamlWriter.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="System" />

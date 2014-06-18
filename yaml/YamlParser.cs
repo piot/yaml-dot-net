@@ -82,7 +82,6 @@ namespace yaml {
 			obj = o;
 			var list = FindMatches(testData);
 			foreach (var item in list) {
-				Console.WriteLine("group:" + item.groupName + " value:" + item.value);
 				switch (item.groupName) {
 					case "variable":
 						ParseVariable(item.value.Substring(0, item.value.Length - 1));
@@ -95,7 +94,6 @@ namespace yaml {
 						break;
 					case "indent":
 						var indent = item.value.Length - 1;
-						Console.WriteLine("indent:" + indent);
 						if (indent == currentIndent + 1) {
 							context.Push(obj);
 							if (activeField != null) {
