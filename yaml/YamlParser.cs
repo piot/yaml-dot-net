@@ -68,9 +68,11 @@ namespace yaml {
 
 		void SetValue(Object v) {
 			if (activeField != null) {
-				activeField.SetValue(targetObject, v);
+				var convertedValue = Convert.ChangeType(v, activeField.FieldType);
+				activeField.SetValue(targetObject, convertedValue);
 			} else if (activeProperty != null) {
-				activeProperty.SetValue(targetObject, v, null);
+				var convertedValue = Convert.ChangeType(v, activeProperty.PropertyType);
+				activeProperty.SetValue(targetObject, convertedValue, null);
 			} else {
 				throw new Exception("Can not set value in cyberspace!");
 			}
