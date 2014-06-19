@@ -2,7 +2,7 @@
 using System.IO;
 
 namespace yaml {
-	public class YamlWriter {
+	internal class YamlWriter {
 		public YamlWriter() {
 		}
 
@@ -11,7 +11,7 @@ namespace yaml {
 		}
 
 		bool ShouldRecurse (Type t) {
-			return !IsPrimitive(t) && t.GetProperties().Length > 0;
+			return !IsPrimitive(t);
 		}
 
 		bool ShouldRecurse (Object o) {
@@ -30,6 +30,9 @@ namespace yaml {
 					writer.WriteLine("{0}{1}:", tabs, p.Name);
 					WriteObject(subValue, writer, indent + 1);
 				} else {
+					if (subValue != null && subValue.GetType() == typeof(String)) {
+						subValue = "'" + subValue + "'";
+					}
 					writer.WriteLine("{0}{1}: {2}", tabs, p.Name, subValue);
 				}
 			}
@@ -40,6 +43,9 @@ namespace yaml {
 					writer.WriteLine("{0}{1}:", tabs, f.Name);
 					WriteObject(subValue, writer, indent + 1);
 				} else {
+					if (subValue != null && subValue.GetType() == typeof(String)) {
+						subValue = "'" + subValue + "'";
+					}
 					writer.WriteLine("{0}{1}: {2}", tabs, f.Name, subValue);
 				}
 			}

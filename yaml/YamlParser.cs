@@ -4,14 +4,18 @@ using System.Collections.Generic;
 using System.Reflection;
 
 namespace yaml {
-	public class YamlParser {
+	internal class YamlParser {
 		struct YamlMatch {
 			public string groupName;
 			public string value;
 		}
-
-		Object obj;
-		Stack<Object> context = new Stack<Object>();
+		struct Context {
+			public Object o;
+			public PropertyInfo propertyInfo;
+			public FieldInfo fieldInfo;
+		}
+		Object targetObject;
+		Stack<Context> contexts = new Stack<Context>();
 		PropertyInfo activeProperty;
 		FieldInfo activeField;
 		int currentIndent;
@@ -51,7 +55,7 @@ namespace yaml {
 		}
 
 		void ParseVariable (string propertyName) {
-			var t = obj.GetType();
+			var t = targetObject.GetType();
 			activeField = null;
 			activeProperty = t.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
 			if (activeProperty == null) {
@@ -64,9 +68,11 @@ namespace yaml {
 
 		void SetValue(Object v) {
 			if (activeField != null) {
-				activeField.SetValue(obj, v);
+				activeField.SetValue(targetObject, v);
 			} else if (activeProperty != null) {
-				activeProperty.SetValue(obj, v, null);
+				activeProperty.SetValue(targetObject, v, null);
+			} else {
+				throw new Exception("Can not set value in cyberspace!");
 			}
 		}
 
@@ -78,8 +84,9 @@ namespace yaml {
 			SetValue(v);
 		}
 
-		public void Parse (Object o, string testData) {
-			obj = o;
+		public T Parse <T> ( string testData) {
+			var root = (T) Activator.CreateInstance(typeof(T));
+			targetObject = root;
 			var list = FindMatches(testData);
 			foreach (var item in list) {
 				switch (item.groupName) {
@@ -87,7 +94,8 @@ namespace yaml {
 						ParseVariable(item.value.Substring(0, item.value.Length - 1));
 						break;
 					case "integer":
-						SetIntegerValue(Int32.Parse(item.value));
+						var integerValue = Int32.Parse(item.value);
+						SetIntegerValue(integerValue);
 						break;
 					case "string":
 						SetStringValue(item.value.Substring(1, item.value.Length - 2));
@@ -95,34 +103,48 @@ namespace yaml {
 					case "indent":
 						var indent = item.value.Length - 1;
 						if (indent == currentIndent + 1) {
-							context.Push(obj);
+							var context = new Context() { o = targetObject, fieldInfo = activeField, propertyInfo = activeProperty };
+							contexts.Push(context);
 							if (activeField != null) {
-								var fieldValue = activeField.GetValue(obj);
+								var fieldValue = activeField.GetValue(targetObject);
 								if (fieldValue == null) {
 									var instance = Activator.CreateInstance(activeField.FieldType);
-									activeField.SetValue(obj, instance);
-									obj = instance;
+									targetObject = instance;
 								} else {
-									obj = fieldValue;
+									targetObject = fieldValue;
 								}
 							} else {
-								var propertyValue = activeProperty.GetValue(obj, null);
+								var propertyValue = activeProperty.GetValue(targetObject, null);
 								if (propertyValue == null) {
 									var instance = Activator.CreateInstance(activeProperty.PropertyType);
-									activeProperty.SetValue(obj, instance, null);
-									obj = instance;
+									targetObject = instance;
+								} else {
+									targetObject = propertyValue;
 								}
 							}
 						} else if (indent == currentIndent) {
-						} else if (indent == currentIndent - 1) {
-							obj = context.Pop();
+						} else if (indent < currentIndent) {
+							for (var i = 0; i < currentIndent - indent; ++i)  {
+								var parentContext = contexts.Pop();
+								if (parentContext.propertyInfo != null) {
+									parentContext.propertyInfo.SetValue(parentContext.o, targetObject, null);
+								} else if (parentContext.fieldInfo != null) {
+									parentContext.fieldInfo .SetValue(parentContext.o, targetObject);
+								}
+								targetObject = parentContext.o;
+							}
 						} else {
-							throw new Exception("Illegal indent!");
+							throw new Exception("Illegal indent:" + indent + " current:" + currentIndent);
 						}
 						currentIndent = indent;
 						break;
 				}
 			}
+
+			if (contexts.Count != 0) {
+				throw new Exception("Illegal count");
+			}
+			return root;
 		}
 	}
 }

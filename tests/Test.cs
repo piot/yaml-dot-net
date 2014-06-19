@@ -1,20 +1,44 @@
 ﻿using NUnit.Framework;
 using System;
 using yaml;
+using System.Xml;
 
 namespace tests {
+
+	public static class AssertEx {
+		static string ObjectToString (object expected) {
+			var x = new System.Xml.Serialization.XmlSerializer(expected.GetType());
+			var writer = new System.IO.StringWriter();
+			x.Serialize(writer, expected);
+			writer.Close();
+			return writer.ToString();
+		}
+
+		public static void AreEqualByXml (object expected, object actual) {
+			var expectedString = ObjectToString(expected);
+			var actualString = ObjectToString(actual);
+
+			Assert.AreEqual(expectedString, actualString);
+		}
+	}
+
 	[TestFixture]
 	public class Test {
 
-		class TestSubKlass {
+		public struct SomeStruct {
+			public int inDaStruct;
+		}
+
+		public class TestSubKlass {
 			public int answer;
 
 			public string anotherAnswer { get; set; }
 
 			public Object anotherObject { get; set; }
+			public SomeStruct someStruct = new SomeStruct();
 		}
 
-		class TestKlass {
+		public class TestKlass {
 			public int john;
 			public string other;
 
@@ -24,12 +48,9 @@ namespace tests {
 		}
 
 		[Test]
-		public void TestParse () {
+		public void TestDeserialize () {
 			var testData = "   john:34  \n subClass: \n\tanswer: 42 \n\t  anotherAnswer: '99' \nother: 'hejsan svejsan' \n props: 'hello,world'";
-			var parser = new YamlParser();
-			var o = new TestKlass();
-
-			parser.Parse(o, testData);
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual(34, o.john);
 			Assert.AreEqual("hejsan svejsan", o.other);
 			Assert.AreEqual("hello,world", o.props);
@@ -38,17 +59,22 @@ namespace tests {
 		}
 
 		[Test]
-		public void TestWrite () {
+		public void TestSerialize () {
 			var o = new TestKlass();
 			o.john = 34;
 			o.subClass = new TestSubKlass();
 			o.subClass.answer = 42;
+			o.subClass.someStruct.inDaStruct = 1;
 			o.props = "props";
+			// o.subClass.anotherObject = new Object();
 
 			o.other = "other";
-			var writer = new YamlWriter();
-			var output = writer.Write(o);
-			Console.WriteLine("output:\n" + output);
+			var output = YamlSerializer.Serialize(o);
+
+			var back = YamlDeserializer.Deserialize<TestKlass>(output);
+			var backOutput = YamlSerializer.Serialize(back);
+			AssertEx.AreEqualByXml(o, back);
+			Assert.AreEqual(output, backOutput);
 		}
 	}
 }
