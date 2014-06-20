@@ -6,5 +6,13 @@ using yaml;
 
 var someObject = new YourClass();
 
-var serialized = YamlSerializer.Serialize(someObject);
+// Convert object to string
+var serializedString = YamlSerializer.Serialize(someObject);
+
+// ...and bring it back
+var yourObject = YamlDeserializer.Deserialize<YourClass>(serializedString);
 ```
+
+### Notes
+* Only supports strings enclosed in `'`.
+* Basic support for float and integers.
