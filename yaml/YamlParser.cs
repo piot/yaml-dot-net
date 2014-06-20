@@ -27,17 +27,20 @@ namespace yaml {
 			var outList = new List<YamlMatch>();
 
 			var variable = "(?<variable>[a-zA-Z_$][a-zA-Z0-9_$]*:)";
-			var hyphen = "(?<hyphen>[\\-])";
+			var hyphen = "(?<hyphen>\\- )";
 			var indent = "(?<indent>\\n[\\t]*)";
 			var stringMatch = "(?<string>\\'.*\\')";
 			var integerMatch = "(?<integer>[-+]?\\d+)";
-			var pattern = variable + "|" + hyphen + "|" + indent + "|" + stringMatch + "|" + integerMatch;
+			var floatMatch = "(?<float>[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)";
+
+			var expressions = new string[] { variable, hyphen, floatMatch, indent, stringMatch, integerMatch };
+			var pattern = string.Join("|", expressions);
 
 			var regExPattern = new Regex(pattern);
 			var matches = regExPattern.Matches(testData);
 
 			foreach (Match match in matches) {
-				if (match.Length > 0) {
+				if (match.Success) {
 					var i = 0;
 					foreach (Group groupData in match.Groups) {
 						if (i > 0 && groupData.Success) {
@@ -49,6 +52,8 @@ namespace yaml {
 						}
 						++i;
 					}
+				} else {
+					Console.WriteLine("NO MATCH:" + match.Value);
 				}
 			}
 			return outList;
@@ -101,6 +106,9 @@ namespace yaml {
 						break;
 					case "string":
 						SetStringValue(item.value.Substring(1, item.value.Length - 2));
+						break;
+					case "float":
+						SetValue(item.value);
 						break;
 					case "indent":
 						var indent = item.value.Length - 1;

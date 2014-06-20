@@ -26,7 +26,7 @@ namespace tests {
 	public class Test {
 
 		public struct SomeStruct {
-			public int inDaStruct;
+			public uint inDaStruct;
 		}
 
 		public class TestSubKlass {
@@ -36,6 +36,7 @@ namespace tests {
 
 			public Object anotherObject { get; set; }
 			public SomeStruct someStruct = new SomeStruct();
+			public float f;
 		}
 
 		public class TestKlass {
@@ -64,6 +65,7 @@ namespace tests {
 			o.john = 34;
 			o.subClass = new TestSubKlass();
 			o.subClass.answer = 42;
+			o.subClass.f = -22.42f;
 			o.subClass.someStruct.inDaStruct = 1;
 			o.props = "props";
 			// o.subClass.anotherObject = new Object();
@@ -75,6 +77,16 @@ namespace tests {
 			var backOutput = YamlSerializer.Serialize(back);
 			AssertEx.AreEqualByXml(o, back);
 			Assert.AreEqual(output, backOutput);
+		}
+
+		public class SomeColor {
+			public string color;
+		};
+		[Test]
+		public void TestString() {
+			var s = "color:    'kind of red'";
+			var c = YamlDeserializer.Deserialize<SomeColor>(s);
+			Assert.AreEqual("kind of red", c.color);
 		}
 	}
 }
