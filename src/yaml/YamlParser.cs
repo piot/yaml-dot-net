@@ -32,8 +32,9 @@ namespace yaml {
 			var stringMatch = "(?<string>\\'.*\\')";
 			var integerMatch = "(?<integer>[-+]?\\d+)";
 			var floatMatch = "(?<float>[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)";
+			var booleanMatch = "(?<boolean>(true)|(false))";
 
-			var expressions = new string[] { variable, hyphen, floatMatch, indent, stringMatch, integerMatch };
+			var expressions = new string[] { variable, hyphen, floatMatch, indent, stringMatch, integerMatch, booleanMatch };
 			var pattern = string.Join("|", expressions);
 
 			var regExPattern = new Regex(pattern);
@@ -109,6 +110,9 @@ namespace yaml {
 						break;
 					case "float":
 						SetValue(item.value);
+						break;
+					case "boolean":
+						SetValue(item.value == "true" ? true : false);
 						break;
 					case "indent":
 						var indent = item.value.Length - 1;

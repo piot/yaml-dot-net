@@ -33,6 +33,10 @@ namespace yaml {
 					if (subValue != null && subValue.GetType() == typeof(String)) {
 						subValue = "'" + subValue + "'";
 					}
+					if (subValue != null && subValue.GetType() == typeof(bool)) {
+						var truth = (bool) subValue;
+						subValue = truth ? "true" : "false";
+					}
 					writer.WriteLine("{0}{1}: {2}", tabs, p.Name, subValue);
 				}
 			}
@@ -45,6 +49,10 @@ namespace yaml {
 				} else {
 					if (subValue != null && subValue.GetType() == typeof(String)) {
 						subValue = "'" + subValue + "'";
+					}
+					if (subValue != null && subValue.GetType() == typeof(bool)) {
+						var truth = (bool) subValue;
+						subValue = truth ? "true" : "false";
 					}
 					writer.WriteLine("{0}{1}: {2}", tabs, f.Name, subValue);
 				}

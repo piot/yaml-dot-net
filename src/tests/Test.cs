@@ -44,6 +44,7 @@ namespace tests {
 			public string other;
 
 			public string props { get; set; }
+			public bool isItTrue;
 
 			public TestSubKlass subClass;
 		}
@@ -68,11 +69,11 @@ namespace tests {
 			o.subClass.f = -22.42f;
 			o.subClass.someStruct.inDaStruct = 1;
 			o.props = "props";
+			o.isItTrue = true;
 			// o.subClass.anotherObject = new Object();
 
 			o.other = "other";
 			var output = YamlSerializer.Serialize(o);
-
 			var back = YamlDeserializer.Deserialize<TestKlass>(output);
 			var backOutput = YamlSerializer.Serialize(back);
 			AssertEx.AreEqualByXml(o, back);
