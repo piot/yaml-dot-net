@@ -21,7 +21,7 @@ namespace yaml {
 		void WriteObject (Object o, StringWriter writer, int indent) {
 			var t = o.GetType();
 
-			var tabs = new String('\t', indent);
+			var tabs = new String(' ', indent * 2);
 
 			var properties = t.GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 			foreach (var p in properties) {

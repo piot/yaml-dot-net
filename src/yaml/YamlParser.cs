@@ -8,6 +8,7 @@ namespace yaml {
 		struct YamlMatch {
 			public string groupName;
 			public string value;
+			public int count;
 		}
 		struct Context {
 			public Object o;
@@ -28,8 +29,8 @@ namespace yaml {
 
 			var variable = "(?<variable>[a-zA-Z_$][a-zA-Z0-9_$]*:)";
 			var hyphen = "(?<hyphen>\\- )";
-			var indent = "(?<indent>\\n[\\t]*)";
-			var stringMatch = "(?<string>\\'.*\\')";
+			var indent = "(?<indent>\\n(\\s{2})*)";
+			var stringMatch = "(?<string>\\'.*\\'|\\\".*\\\")";
 			var integerMatch = "(?<integer>[-+]?\\d+)";
 			var floatMatch = "(?<float>[-+]?[0-9]*\\.?[0-9]+([eE][-+]?[0-9]+)?)";
 			var booleanMatch = "(?<boolean>(true)|(false))";
@@ -115,7 +116,7 @@ namespace yaml {
 						SetValue(item.value == "true" ? true : false);
 						break;
 					case "indent":
-						var indent = item.value.Length - 1;
+						var indent = (item.value.Length - 1) / 2;
 						if (indent == currentIndent + 1) {
 							var context = new Context() { o = targetObject, fieldInfo = activeField, propertyInfo = activeProperty };
 							contexts.Push(context);

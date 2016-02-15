@@ -51,13 +51,20 @@ namespace tests {
 
 		[Test]
 		public void TestDeserialize () {
-			var testData = "   john:34  \n subClass: \n\tanswer: 42 \n\t  anotherAnswer: '99' \nother: 'hejsan svejsan' \n props: 'hello,world'";
+			var testData = "john:34  \nsubClass: \n  answer: 42 \n  anotherAnswer: '99'\nother: 'hejsan svejsan' \nprops: 'hello,world'";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual(34, o.john);
 			Assert.AreEqual("hejsan svejsan", o.other);
 			Assert.AreEqual("hello,world", o.props);
 			Assert.AreEqual(42, o.subClass.answer);
 			Assert.AreEqual("99", o.subClass.anotherAnswer);
+		}
+
+		[Test]
+		public void TestDeserializeString () {
+			var testData = "anotherAnswer: \"example\"";
+			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
+			Assert.AreEqual("example", o.anotherAnswer);
 		}
 
 		[Test]
