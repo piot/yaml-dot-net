@@ -25,7 +25,7 @@ namespace tests {
 	[TestFixture]
 	public class Test {
 
-		public struct SomeStruct {
+		public class SomeClass {
 			public uint inDaStruct;
 		}
 
@@ -35,7 +35,7 @@ namespace tests {
 			public string anotherAnswer { get; set; }
 
 			public Object anotherObject { get; set; }
-			public SomeStruct someStruct = new SomeStruct();
+			public SomeClass someClass = new SomeClass();
 			public float f;
 		}
 
@@ -47,6 +47,11 @@ namespace tests {
 			public bool isItTrue;
 
 			public TestSubKlass subClass;
+		}
+
+		public class TestIntKlass
+		{
+			public uint someInt;
 		}
 
 		[Test]
@@ -68,19 +73,56 @@ namespace tests {
 		}
 
 		[Test]
+		public void TestAutomaticScalar () {
+			var testData = "other: example\nsubClass:\n  anotherAnswer: yes";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual("example", o.other);
+			Assert.AreEqual("yes", o.subClass.anotherAnswer);
+		}
+
+		[Test]
+		public void TestIntegerToString () {
+			var testData = "anotherAnswer: 0x232323";
+			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
+			Assert.AreEqual("2302755", o.anotherAnswer);
+		}
+
+		[Test]
+		public void TestHexInteger () {
+			var testData = "someInt: 0xffa800\n  ";
+			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
+			Assert.AreEqual(16754688, o.someInt);
+		}
+
+		[Test]
+		public void TestInteger () {
+			var testData = "someInt: 1";
+			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
+			Assert.AreEqual(1, o.someInt);
+		}
+
+		[Test]
+		public void TestIntegerWithComment () {
+			var testData = "someInt: 1 # some comment here";
+			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
+			Assert.AreEqual(1, o.someInt);
+		}
+
+		[Test]
 		public void TestSerialize () {
 			var o = new TestKlass();
 			o.john = 34;
 			o.subClass = new TestSubKlass();
 			o.subClass.answer = 42;
 			o.subClass.f = -22.42f;
-			o.subClass.someStruct.inDaStruct = 1;
+			o.subClass.someClass.inDaStruct = 1;
 			o.props = "props";
 			o.isItTrue = true;
 			// o.subClass.anotherObject = new Object();
 
 			o.other = "other";
 			var output = YamlSerializer.Serialize(o);
+			Console.WriteLine ("Output:{0}", output);
 			var back = YamlDeserializer.Deserialize<TestKlass>(output);
 			var backOutput = YamlSerializer.Serialize(back);
 			AssertEx.AreEqualByXml(o, back);
