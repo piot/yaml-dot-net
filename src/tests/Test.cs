@@ -101,7 +101,7 @@ namespace tests {
 			Assert.AreEqual(1, o.someInt);
 		}
 
-		[Test]
+		//[Test]
 		public void TestIntegerWithComment () {
 			var testData = "someInt: 1 # some comment here";
 			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
