@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net3.5</TargetFramework>
+    <LangVersion>9</LangVersion>
+    <Company>Piot.Yaml</Company>
+    <Product>Piot.Yaml</Product>
+    <AssemblyName>Piot.Yaml</AssemblyName>
+    <RootNamespace>Piot.Yaml</RootNamespace>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
+  </PropertyGroup>
+</Project>

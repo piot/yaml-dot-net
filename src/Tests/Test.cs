@@ -1,7 +1,6 @@
-﻿using NUnit.Framework;
-using System;
-using yaml;
-using System.Xml;
+﻿using System;
+using Piot.Yaml;
+using NUnit.Framework;
 
 namespace tests {
 
@@ -52,6 +51,7 @@ namespace tests {
 		public class TestIntKlass
 		{
 			public uint someInt;
+			public int somethingElse;
 		}
 
 		[Test]
@@ -68,6 +68,13 @@ namespace tests {
 		[Test]
 		public void TestDeserializeString () {
 			var testData = "anotherAnswer: \"example\"";
+			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
+			Assert.AreEqual("example", o.anotherAnswer);
+		}
+		
+		[Test]
+		public void TestDeserializeString2() {
+			var testData = "anotherAnswer: example";
 			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
 			Assert.AreEqual("example", o.anotherAnswer);
 		}
@@ -101,6 +108,15 @@ namespace tests {
 			Assert.AreEqual(1, o.someInt);
 		}
 
+		
+		[Test]
+		public void TestInteger2() {
+			var testData = "someInt: 1\nsomethingElse: 5 ";
+			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
+			Assert.AreEqual(1, o.someInt);
+			Assert.AreEqual(5, o.somethingElse);
+		}
+		
 		//[Test]
 		public void TestIntegerWithComment () {
 			var testData = "someInt: 1 # some comment here";
