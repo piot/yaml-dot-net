@@ -90,6 +90,7 @@ namespace Piot.Yaml
 		void ParseVariable(string propertyName)
 		{
 			var t = targetObject.GetType();
+
 			activeField = null;
 			activeProperty = t.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
 			if(activeProperty == null)
@@ -99,6 +100,39 @@ namespace Piot.Yaml
 
 			if(activeProperty == null && activeField == null)
 			{
+				var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+				foreach (var field in fields)
+				{
+					var hasAttribute = Attribute.IsDefined(field, typeof(YamlPropertyAttribute));
+					if(hasAttribute)
+					{
+						var attribute =
+							(YamlPropertyAttribute)Attribute.GetCustomAttribute(field, typeof(YamlPropertyAttribute));
+						if(attribute.Description == propertyName)
+						{
+							activeField = field;
+							return;
+						}
+					}
+				}
+
+				var properties = t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+				foreach (var property in properties)
+				{
+					var hasAttribute = Attribute.IsDefined(property, typeof(YamlPropertyAttribute));
+					if(hasAttribute)
+					{
+						var attribute =
+							(YamlPropertyAttribute)Attribute.GetCustomAttribute(property,
+								typeof(YamlPropertyAttribute));
+						if(attribute.Description == propertyName)
+						{
+							activeProperty = property;
+							return;
+						}
+					}
+				}
+
 				throw new Exception("Couldn't find property:" + propertyName);
 			}
 		}

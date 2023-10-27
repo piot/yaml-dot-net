@@ -2,10 +2,12 @@
 using Piot.Yaml;
 using NUnit.Framework;
 
-namespace tests {
-
-	public static class AssertEx {
-		static string ObjectToString (object expected) {
+namespace tests
+{
+	public static class AssertEx
+	{
+		static string ObjectToString(object expected)
+		{
 			var x = new System.Xml.Serialization.XmlSerializer(expected.GetType());
 			var writer = new System.IO.StringWriter();
 			x.Serialize(writer, expected);
@@ -13,7 +15,8 @@ namespace tests {
 			return writer.ToString();
 		}
 
-		public static void AreEqualByXml (object expected, object actual) {
+		public static void AreEqualByXml(object expected, object actual)
+		{
 			var expectedString = ObjectToString(expected);
 			var actualString = ObjectToString(actual);
 
@@ -22,26 +25,31 @@ namespace tests {
 	}
 
 	[TestFixture]
-	public class Test {
-
-		public class SomeClass {
+	public class Test
+	{
+		public class SomeClass
+		{
 			public uint inDaStruct;
 		}
 
-		public class TestSubKlass {
+		public class TestSubKlass
+		{
 			public int answer;
 
-			public string anotherAnswer { get; set; }
+			[YamlProperty("anotherAnswer")]
+			public string AnOTHerAnswer { get; set; }
 
 			public Object anotherObject { get; set; }
-			public SomeClass someClass = new SomeClass();
+			public SomeClass someClass = new();
 			public float f;
 		}
 
-		public class TestKlass {
+		public class TestKlass
+		{
 			public int john;
 			public string other;
 
+			[YamlProperty("props_custom")]
 			public string props { get; set; }
 			public bool isItTrue;
 
@@ -55,77 +63,88 @@ namespace tests {
 		}
 
 		[Test]
-		public void TestDeserialize () {
-			var testData = "john:34  \nsubClass: \n  answer: 42 \n  anotherAnswer: '99'\nother: 'hejsan svejsan' \nprops: 'hello,world'";
+		public void TestDeserialize()
+		{
+			var testData =
+				"john:34  \nsubClass: \n  answer: 42 \n  anotherAnswer: '99'\nother: 'hejsan svejsan' \nprops_custom: 'hello,world'";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual(34, o.john);
 			Assert.AreEqual("hejsan svejsan", o.other);
 			Assert.AreEqual("hello,world", o.props);
 			Assert.AreEqual(42, o.subClass.answer);
-			Assert.AreEqual("99", o.subClass.anotherAnswer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
 		}
 
 		[Test]
-		public void TestDeserializeString () {
+		public void TestDeserializeString()
+		{
 			var testData = "anotherAnswer: \"example\"";
 			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
-			Assert.AreEqual("example", o.anotherAnswer);
-		}
-		
-		[Test]
-		public void TestDeserializeString2() {
-			var testData = "anotherAnswer: example";
-			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
-			Assert.AreEqual("example", o.anotherAnswer);
+			Assert.AreEqual("example", o.AnOTHerAnswer);
 		}
 
 		[Test]
-		public void TestAutomaticScalar () {
+		public void TestDeserializeString2()
+		{
+			var testData = "anotherAnswer: example";
+			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
+			Assert.AreEqual("example", o.AnOTHerAnswer);
+		}
+
+		[Test]
+		public void TestAutomaticScalar()
+		{
 			var testData = "other: example\nsubClass:\n  anotherAnswer: yes";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual("example", o.other);
-			Assert.AreEqual("yes", o.subClass.anotherAnswer);
+			Assert.AreEqual("yes", o.subClass.AnOTHerAnswer);
 		}
 
 		[Test]
-		public void TestIntegerToString () {
+		public void TestIntegerToString()
+		{
 			var testData = "anotherAnswer: 0x232323";
 			var o = YamlDeserializer.Deserialize<TestSubKlass>(testData);
-			Assert.AreEqual("2302755", o.anotherAnswer);
+			Assert.AreEqual("2302755", o.AnOTHerAnswer);
 		}
 
 		[Test]
-		public void TestHexInteger () {
+		public void TestHexInteger()
+		{
 			var testData = "someInt: 0xffa800\n  ";
 			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
 			Assert.AreEqual(16754688, o.someInt);
 		}
 
 		[Test]
-		public void TestInteger () {
+		public void TestInteger()
+		{
 			var testData = "someInt: 1";
 			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
 			Assert.AreEqual(1, o.someInt);
 		}
 
-		
+
 		[Test]
-		public void TestInteger2() {
+		public void TestInteger2()
+		{
 			var testData = "someInt: 1\nsomethingElse: 5 ";
 			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
 			Assert.AreEqual(1, o.someInt);
 			Assert.AreEqual(5, o.somethingElse);
 		}
-		
+
 		//[Test]
-		public void TestIntegerWithComment () {
+		public void TestIntegerWithComment()
+		{
 			var testData = "someInt: 1 # some comment here";
 			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
 			Assert.AreEqual(1, o.someInt);
 		}
 
 		[Test]
-		public void TestSerialize () {
+		public void TestSerialize()
+		{
 			var o = new TestKlass();
 			o.john = 34;
 			o.subClass = new TestSubKlass();
@@ -138,22 +157,24 @@ namespace tests {
 
 			o.other = "other";
 			var output = YamlSerializer.Serialize(o);
-			Console.WriteLine ("Output:{0}", output);
+			Console.WriteLine("Output:{0}", output);
 			var back = YamlDeserializer.Deserialize<TestKlass>(output);
 			var backOutput = YamlSerializer.Serialize(back);
 			AssertEx.AreEqualByXml(o, back);
 			Assert.AreEqual(output, backOutput);
 		}
 
-		public class SomeColor {
+		public class SomeColor
+		{
 			public string color;
 		};
+
 		[Test]
-		public void TestString() {
+		public void TestString()
+		{
 			var s = "color:    'kind of red'";
 			var c = YamlDeserializer.Deserialize<SomeColor>(s);
 			Assert.AreEqual("kind of red", c.color);
 		}
 	}
 }
-
