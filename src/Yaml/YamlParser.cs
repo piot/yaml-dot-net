@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -30,6 +30,7 @@ namespace Piot.Yaml
 		PropertyInfo activeProperty;
 		FieldInfo activeField;
 		int currentIndent;
+		private int lastDetectedIndent;
 
 
 		List<YamlMatch> FindMatches(string testData)
@@ -74,7 +75,6 @@ namespace Piot.Yaml
 						{
 							var groupName = regExPattern.GroupNameFromNumber(i);
 							var yamlMatch = new YamlMatch();
-							Console.WriteLine($"Found: groupName:{groupName} => value:{match.Value}");
 							yamlMatch.groupName = groupName;
 							yamlMatch.value = match.Value;
 							outList.Add(yamlMatch);
@@ -85,7 +85,7 @@ namespace Piot.Yaml
 				}
 				else
 				{
-					Console.WriteLine("NO MATCH:" + match.Value);
+					throw new Exception($"NO MATCH:" + match.Value);
 				}
 			}
 
@@ -157,12 +157,14 @@ namespace Piot.Yaml
 					                          " because:" + e.ToString());
 				}
 
+				// Console.WriteLine($"set field {activeField} in {targetObject} <- {convertedValue}");
 				activeField.SetValue(targetObject, convertedValue);
 			}
 			else if(activeProperty != null)
 			{
 				var convertedValue = Convert.ChangeType(v, activeProperty.PropertyType);
 				activeProperty.SetValue(targetObject, convertedValue, null);
+				// Console.WriteLine($"set property {targetObject} <- {convertedValue}");
 			}
 			else
 			{
@@ -185,78 +187,88 @@ namespace Piot.Yaml
 			SetValue(v);
 		}
 
-		private void SetIndent(int indent)
+		private void PushDown()
 		{
-			if(indent == currentIndent + 1)
-			{
-				var context = new Context()
-					{ o = targetObject, fieldInfo = activeField, propertyInfo = activeProperty };
-				contexts.Push(context);
-				if(activeField != null)
-				{
-					var fieldValue = activeField.GetValue(targetObject);
-					if(fieldValue == null)
-					{
-						var instance = Activator.CreateInstance(activeField.FieldType);
-						targetObject = instance;
-					}
-					else
-					{
-						targetObject = fieldValue;
-					}
-				}
-				else
-				{
-					var propertyValue = activeProperty.GetValue(targetObject, null);
-					if(propertyValue == null)
-					{
-						var instance = Activator.CreateInstance(activeProperty.PropertyType);
-						targetObject = instance;
-					}
-					else
-					{
-						targetObject = propertyValue;
-					}
-				}
-			}
-			else if(indent == currentIndent)
-			{
-			}
-			else if(indent < currentIndent)
-			{
-				for (var i = 0; i < currentIndent - indent; ++i)
-				{
-					var parentContext = contexts.Pop();
-					if(parentContext.propertyInfo != null)
-					{
-						parentContext.propertyInfo.SetValue(parentContext.o, targetObject, null);
-					}
-					else if(parentContext.fieldInfo != null)
-					{
-						parentContext.fieldInfo.SetValue(parentContext.o, targetObject);
-					}
+			var context = new Context
+				{ o = targetObject, fieldInfo = activeField, propertyInfo = activeProperty };
+//			Console.WriteLine($"pushing context {lastIndent}");
+			contexts.Push(context);
 
-					targetObject = parentContext.o;
-				}
+			if(activeField != null)
+			{
+				var instance = Activator.CreateInstance(activeField.FieldType);
+				targetObject = instance;
 			}
 			else
 			{
-				throw new Exception("Illegal indent:" + indent + " current:" + currentIndent);
+				var instance = Activator.CreateInstance(activeProperty.PropertyType);
+				targetObject = instance;
 			}
 
-			currentIndent = indent;
+			activeField = null;
+			activeProperty = null;
+		}
+
+		private void PopContext()
+		{
+			for (var i = 0; i < currentIndent - lastDetectedIndent; ++i)
+			{
+				var parentContext = contexts.Pop();
+				if(parentContext.propertyInfo != null)
+				{
+					//Console.WriteLine(
+					//	$"setting to parent class {parentContext.propertyInfo} {parentContext.o}  from value that has been done {targetObject}");
+					parentContext.propertyInfo.SetValue(parentContext.o, targetObject, null);
+				}
+				else if(parentContext.fieldInfo != null)
+				{
+					//Console.WriteLine(
+					//	$"setting to parent object {parentContext.fieldInfo} {parentContext.o} {parentContext.o.GetType().FullName} from value that has been done {targetObject}");
+					parentContext.fieldInfo.SetValue(parentContext.o, targetObject);
+				}
+
+				targetObject = parentContext.o;
+			}
+		}
+
+		private void SetIndent()
+		{
+			if(lastDetectedIndent == currentIndent + 1)
+			{
+				PushDown();
+			}
+			else if(lastDetectedIndent < currentIndent)
+			{
+				PopContext();
+			}
+			else
+			{
+				throw new Exception("Illegal indent:" + lastDetectedIndent + " current:" + currentIndent);
+			}
+
+			currentIndent = lastDetectedIndent;
 		}
 
 		public T Parse<T>(string testData)
 		{
 			var root = (T)Activator.CreateInstance(typeof(T));
+			//var root = (T)FormatterServices.GetUninitializedObject(typeof(T));
+
 			targetObject = root;
+			activeProperty = null;
+			activeField = null;
+
 			var list = FindMatches(testData);
 			foreach (var item in list)
 			{
 				switch (item.groupName)
 				{
 					case "variable":
+						if(lastDetectedIndent != currentIndent)
+						{
+							SetIndent();
+						}
+
 						ParseVariable(item.value.Substring(0, item.value.Length - 1));
 						break;
 					case "integer":
@@ -291,17 +303,15 @@ namespace Piot.Yaml
 						break;
 					case "indent":
 						var indent = (item.value.Length - 1) / 2;
-						SetIndent(indent);
+						lastDetectedIndent = indent;
 						break;
 				}
 			}
 
-			if(contexts.Count != 0)
-			{
-				SetIndent(0);
-			}
+			lastDetectedIndent = 0;
+			PopContext();
 
-			return root;
+			return (T)targetObject;
 		}
 	}
 }

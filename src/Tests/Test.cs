@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-﻿using System;
+using System;
 using Piot.Yaml;
 using NUnit.Framework;
 
@@ -41,10 +41,8 @@ namespace tests
 		{
 			public int answer;
 
-			[YamlProperty("anotherAnswer")]
-			public string AnOTHerAnswer { get; set; }
+			[YamlProperty("anotherAnswer")] public string AnOTHerAnswer { get; set; }
 
-			public Object anotherObject { get; set; }
 			public SomeClass someClass = new();
 			public float f;
 		}
@@ -54,8 +52,7 @@ namespace tests
 			public int john;
 			public string other;
 
-			[YamlProperty("props_custom")]
-			public string props { get; set; }
+			[YamlProperty("props_custom")] public string props { get; set; }
 			public bool isItTrue;
 
 			public TestSubKlass subClass;
@@ -66,6 +63,13 @@ namespace tests
 			public uint someInt;
 			public int somethingElse;
 		}
+		
+		public struct TestStandaloneIntKlass
+		{
+			public uint someInt;
+			public int somethingElse;
+		}
+
 
 		[Test]
 		public void TestDeserialize()
@@ -99,7 +103,10 @@ namespace tests
 		[Test]
 		public void TestAutomaticScalar()
 		{
-			var testData = "other: example\nsubClass:\n  anotherAnswer: yes";
+			var testData = @"
+other: example
+subClass:
+  anotherAnswer: yes";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual("example", o.other);
 			Assert.AreEqual("yes", o.subClass.AnOTHerAnswer);
@@ -122,6 +129,14 @@ namespace tests
 		}
 
 		[Test]
+		public void TestStandaloneHexInteger()
+		{
+			var testData = "someInt: 0xffa800\n  ";
+			var o = YamlDeserializer.Deserialize<TestStandaloneIntKlass>(testData);
+			Assert.AreEqual(16754688, o.someInt);
+		}
+		
+		[Test]
 		public void TestInteger()
 		{
 			var testData = "someInt: 1";
@@ -139,7 +154,7 @@ namespace tests
 			Assert.AreEqual(5, o.somethingElse);
 		}
 
-		//[Test]
+		[Test]
 		public void TestIntegerWithComment()
 		{
 			var testData = "someInt: 1 # some comment here";
@@ -158,7 +173,6 @@ namespace tests
 			o.subClass.someClass.inDaStruct = 1;
 			o.props = "props";
 			o.isItTrue = true;
-			// o.subClass.anotherObject = new Object();
 
 			o.other = "other";
 			var output = YamlSerializer.Serialize(o);
@@ -169,7 +183,7 @@ namespace tests
 			Assert.AreEqual(output, backOutput);
 		}
 
-		public class SomeColor
+		public struct SomeColor
 		{
 			public string color;
 		};
