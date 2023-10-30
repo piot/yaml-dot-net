@@ -83,6 +83,29 @@ namespace tests
 			Assert.AreEqual(42, o.subClass.answer);
 			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
 		}
+		
+		[Test]
+		public void TestDeserializeWithSpacesBeforeColon()
+		{
+			var testData =@"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
 
 		[Test]
 		public void TestDeserializeString()
@@ -102,6 +125,19 @@ namespace tests
 
 		[Test]
 		public void TestAutomaticScalar()
+		{
+			var testData = @"
+other: example
+subClass:
+  anotherAnswer: yes";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual("example", o.other);
+			Assert.AreEqual("yes", o.subClass.AnOTHerAnswer);
+		}
+		
+		
+		[Test]
+		public void TestAutomaticScalarWithSpaces()
 		{
 			var testData = @"
 other: example

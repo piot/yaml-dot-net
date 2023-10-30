@@ -32,18 +32,17 @@ namespace Piot.Yaml
 		int currentIndent;
 		private int lastDetectedIndent;
 
-
 		List<YamlMatch> FindMatches(string testData)
 		{
 			var outList = new List<YamlMatch>();
 
-			var variable = @"(?<variable>[a-zA-Z_$][a-zA-Z0-9_$]*:)";
-			var hyphen = @"(?<hyphen>^-\s(.+)$)";
-			var indent = @"(?<indent>\n+(\s{2})*)";
+			var variable = @"(?<variable>[a-zA-Z_$][a-zA-Z0-9_$]*\s*:)";
+			var hyphen = @"(?<hyphen>^-\s*$)";
+			var indent = @"(?<indent>\n+(?<indentspaces>\s{2})*)";
 			var stringMatch = @"(?<string>.*)";
 			var integerMatch = @"(?<integer>\s*[-+]?[1-9]\d*)";
 			var hexMatch = @"(?<hex>\s*0[xX][0-9a-fA-F]*)";
-			var floatMatch = @"(?<float>\s*[-+]?[0-9]*\.[0-9]+([eE][-+]?[0-9]+)?)";
+			var floatMatch = @"(?<float>\s*[-+]?[0-9]*\.[0-9]+(?<exponent>[eE][-+]?[0-9]+)?)";
 			var booleanMatch = @"(?<boolean>(true)|(false))";
 			var commentMatch = @"(?<comment>\s*\#.+)";
 
@@ -76,6 +75,7 @@ namespace Piot.Yaml
 							var groupName = regExPattern.GroupNameFromNumber(i);
 							var yamlMatch = new YamlMatch();
 							yamlMatch.groupName = groupName;
+							Console.WriteLine($"group:{groupName} '{match.Value}'");
 							yamlMatch.value = match.Value;
 							outList.Add(yamlMatch);
 						}
@@ -259,8 +259,11 @@ namespace Piot.Yaml
 			activeField = null;
 
 			var list = FindMatches(testData);
+
 			foreach (var item in list)
 			{
+				Console.WriteLine($"parsing {item.groupName} {item.value}");
+
 				switch (item.groupName)
 				{
 					case "variable":
@@ -269,7 +272,7 @@ namespace Piot.Yaml
 							SetIndent();
 						}
 
-						ParseVariable(item.value.Substring(0, item.value.Length - 1));
+						ParseVariable(item.value.Substring(0, item.value.Length - 1).Trim());
 						break;
 					case "integer":
 						var integerValue = int.Parse(item.value);
@@ -282,17 +285,17 @@ namespace Piot.Yaml
 						break;
 					case "string":
 						var s = item.value.Trim();
-						if(s.Length > 0)
+						if(s.Length == 0)
 						{
-							if((s[0] == '\"' || s[0] == '\''))
-							{
-								SetStringValue(s.Substring(1, s.Length - 2));
-							}
-							else
-							{
-								SetStringValue(s);
-							}
+							break;
 						}
+
+						if((s[0] == '\"' || s[0] == '\''))
+						{
+							s = s.Substring(1, s.Length - 2);
+						}
+
+						SetStringValue(s);
 
 						break;
 					case "float":
@@ -302,9 +305,18 @@ namespace Piot.Yaml
 						SetValue(item.value == "true");
 						break;
 					case "indent":
-						var indent = (item.value.Length - 1) / 2;
-						lastDetectedIndent = indent;
+						lastDetectedIndent = (item.value.Length - 1) / 2;
+						Console.WriteLine($"detected indent {lastDetectedIndent}");
 						break;
+					case "indentspaces":
+						break;
+					case "comment":
+						break;
+					case "pipe":
+						Console.WriteLine($"MULTI: '{item.value}'");
+						break;
+					default:
+						throw new Exception($"Unhandled group: {item.groupName}");
 				}
 			}
 
