@@ -75,7 +75,6 @@ namespace Piot.Yaml
 							var groupName = regExPattern.GroupNameFromNumber(i);
 							var yamlMatch = new YamlMatch();
 							yamlMatch.groupName = groupName;
-							Console.WriteLine($"group:{groupName} '{match.Value}'");
 							yamlMatch.value = match.Value;
 							outList.Add(yamlMatch);
 						}
@@ -262,8 +261,6 @@ namespace Piot.Yaml
 
 			foreach (var item in list)
 			{
-				Console.WriteLine($"parsing {item.groupName} {item.value}");
-
 				switch (item.groupName)
 				{
 					case "variable":
@@ -306,14 +303,10 @@ namespace Piot.Yaml
 						break;
 					case "indent":
 						lastDetectedIndent = (item.value.Length - 1) / 2;
-						Console.WriteLine($"detected indent {lastDetectedIndent}");
 						break;
 					case "indentspaces":
 						break;
 					case "comment":
-						break;
-					case "pipe":
-						Console.WriteLine($"MULTI: '{item.value}'");
 						break;
 					default:
 						throw new Exception($"Unhandled group: {item.groupName}");

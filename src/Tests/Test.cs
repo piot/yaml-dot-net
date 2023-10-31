@@ -32,22 +32,22 @@ namespace tests
 	[TestFixture]
 	public class Test
 	{
-		public class SomeClass
+		public struct SomeClass
 		{
 			public uint inDaStruct;
 		}
 
-		public class TestSubKlass
+		public struct TestSubKlass
 		{
 			public int answer;
 
 			[YamlProperty("anotherAnswer")] public string AnOTHerAnswer { get; set; }
 
-			public SomeClass someClass = new();
+			public SomeClass someClass;
 			public float f;
 		}
 
-		public class TestKlass
+		public struct TestKlass
 		{
 			public int john;
 			public string other;
@@ -58,13 +58,13 @@ namespace tests
 			public TestSubKlass subClass;
 		}
 
-		public class TestIntKlass
+		public struct TestIntKlass
 		{
 			public uint someInt;
 			public int somethingElse;
 		}
 		
-		public struct TestStandaloneIntKlass
+		public class TestStandaloneIntKlass
 		{
 			public uint someInt;
 			public int somethingElse;
