@@ -40,8 +40,10 @@ namespace tests
 		public enum SomeEnum
 		{
 			FirstChoice,
-			Second
+			Second,
+			[YamlProperty("_third")] Third
 		}
+
 		public struct TestSubKlass
 		{
 			public int answer;
@@ -69,7 +71,7 @@ namespace tests
 			public uint someInt;
 			public int somethingElse;
 		}
-		
+
 		public class TestStandaloneIntKlass
 		{
 			public uint someInt;
@@ -89,11 +91,11 @@ namespace tests
 			Assert.AreEqual(42, o.subClass.answer);
 			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
 		}
-		
+
 		[Test]
 		public void TestDeserializeWithSpacesBeforeColon()
 		{
-			var testData =@"
+			var testData = @"
 john:34  
 subClass  : 
   answer: 42 
@@ -112,11 +114,11 @@ props_custom: 'hello,world'
 			Assert.AreEqual(42, o.subClass.answer);
 			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
 		}
-		
+
 		[Test]
 		public void TestEnum()
 		{
-			var testData =@"
+			var testData = @"
 john:34  
 subClass  : 
   answer: 42 
@@ -131,6 +133,31 @@ props_custom: 'hello,world'
 ";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual(SomeEnum.Second, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+		[Test]
+		public void TestEnumWithDifferentName()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: _third
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Third, o.subClass.someEnum);
 			Assert.AreEqual(34, o.john);
 			Assert.AreEqual("hejsan svejsan", o.other);
 			Assert.AreEqual("hello,world", o.props);
@@ -166,8 +193,8 @@ subClass:
 			Assert.AreEqual("example", o.other);
 			Assert.AreEqual("yes", o.subClass.AnOTHerAnswer);
 		}
-		
-		
+
+
 		[Test]
 		public void TestAutomaticScalarWithSpaces()
 		{
@@ -203,7 +230,7 @@ subClass:
 			var o = YamlDeserializer.Deserialize<TestStandaloneIntKlass>(testData);
 			Assert.AreEqual(16754688, o.someInt);
 		}
-		
+
 		[Test]
 		public void TestInteger()
 		{

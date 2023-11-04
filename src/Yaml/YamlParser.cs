@@ -54,6 +54,24 @@ namespace Piot.Yaml
 				this.debugName = debugName;
 			}
 
+			static object GetEnumTypeFromValue(Type enumType, string enumValue)
+			{
+				foreach (var value in Enum.GetValues(enumType))
+				{
+					var enumFieldInfo = enumType.GetField(value.ToString());
+					var allCustomAttributes =
+						(YamlPropertyAttribute[])enumFieldInfo.GetCustomAttributes(typeof(YamlPropertyAttribute),
+							false);
+					if(allCustomAttributes.Length <= 0) continue;
+					if(allCustomAttributes[0].Description == enumValue)
+					{
+						return value;
+					}
+				}
+
+				return null;
+			}
+
 			void SetValueToEnum(string enumValueString)
 			{
 				object enumValue;
@@ -63,8 +81,13 @@ namespace Piot.Yaml
 				}
 				catch (ArgumentException e)
 				{
-					throw new ArgumentException(
-						$"PiotYaml: Enum value '{enumValueString} was not found in enum of type {fieldOrPropertyType} {debugName} {e}");
+					enumValue = GetEnumTypeFromValue(fieldOrPropertyType, enumValueString);
+					if(enumValue == null)
+					{
+						// try to find it using a value
+						throw new ArgumentException(
+							$"PiotYaml: Enum value '{enumValueString} was not found in enum of type {fieldOrPropertyType} {debugName} {e}");
+					}
 				}
 
 				SetValueInternal(enumValue);
