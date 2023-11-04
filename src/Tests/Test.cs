@@ -6,6 +6,7 @@
 using System;
 using Piot.Yaml;
 using NUnit.Framework;
+using System.Collections.Generic;
 
 namespace tests
 {
@@ -37,6 +38,16 @@ namespace tests
 			public uint inDaStruct;
 		}
 
+		public struct SomeItem
+		{
+			public int x;
+
+			public override string ToString()
+			{
+				return $"item:{x}";
+			}
+		}
+
 		public enum SomeEnum
 		{
 			FirstChoice,
@@ -52,6 +63,8 @@ namespace tests
 
 			public SomeClass someClass;
 			public SomeEnum someEnum;
+			public SomeItem[] someItems;
+
 			public float f;
 		}
 
@@ -167,6 +180,58 @@ props_custom: 'hello,world'
 
 
 		[Test]
+		public void TestDeserializeWithList()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someItems:
+    - x: 23
+    - x: 42
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(23, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+
+		[Test]
+		public void TestDeserializeWithWrongHyphenList()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someItems:
+  - x: 23
+  - x: 42
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = Assert.Throws<Exception>(() => YamlDeserializer.Deserialize<TestKlass>(testData));
+		}
+
+
+		[Test]
 		public void TestDeserializeString()
 		{
 			var testData = "anotherAnswer: \"example\"";
@@ -268,6 +333,33 @@ subClass:
 			o.subClass.someClass.inDaStruct = 1;
 			o.props = "props";
 			o.isItTrue = true;
+			o.subClass.someItems = new SomeItem[0];
+
+			o.other = "other";
+			var output = YamlSerializer.Serialize(o);
+			Console.WriteLine("Output:{0}", output);
+			var back = YamlDeserializer.Deserialize<TestKlass>(output);
+			var backOutput = YamlSerializer.Serialize(back);
+			AssertEx.AreEqualByXml(o, back);
+			Assert.AreEqual(output, backOutput);
+		}
+
+		[Test]
+		public void TestSerializeWithList()
+		{
+			var o = new TestKlass();
+			o.john = 34;
+			o.subClass = new TestSubKlass();
+			o.subClass.answer = 42;
+			o.subClass.f = -22.42f;
+			o.subClass.someClass.inDaStruct = 1;
+			o.props = "props";
+			o.isItTrue = true;
+			o.subClass.someItems = new SomeItem[]
+			{
+				new() { x = 399 },
+				new() { x = 42 }
+			};
 
 			o.other = "other";
 			var output = YamlSerializer.Serialize(o);

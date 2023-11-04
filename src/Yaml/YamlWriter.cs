@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-﻿using System;
+using System;
 using System.IO;
 using System.Reflection;
 
@@ -13,22 +13,55 @@ namespace Piot.Yaml
 	{
 		bool IsPrimitive(Type t)
 		{
-			return t.IsPrimitive || t == typeof(Decimal) || t == typeof(String);
+			return t.IsPrimitive || t == typeof(Decimal) || t == typeof(String) || t.IsEnum;
 		}
 
 		bool ShouldRecurse(Type t)
 		{
-			return !IsPrimitive(t);
+			return !IsPrimitive(t) || t.IsArray;
 		}
 
 		bool ShouldRecurse(Object o)
 		{
+			if(o != null && o.GetType().IsArray && ((Array)o).Length == 0)
+			{
+				return false;
+			}
+
 			return o != null && ShouldRecurse(o.GetType());
+		}
+
+		void WriteEnum(object o, StringWriter writer)
+		{
+			writer.Write($"{o}");
+		}
+
+		void WriteArray(object o, StringWriter writer, int indent)
+		{
+			var arr = (Array)o;
+			var tabs = new String(' ', indent * 2);
+
+			foreach (var item in arr)
+			{
+				writer.Write($"{tabs}- ");
+				WriteObject(item, writer, indent);
+			}
 		}
 
 		void WriteObject(Object o, StringWriter writer, int indent)
 		{
 			var t = o.GetType();
+			if(t.IsEnum)
+			{
+				WriteEnum(o, writer);
+				return;
+			}
+
+			if(t.IsArray)
+			{
+				WriteArray(o, writer, indent);
+				return;
+			}
 
 			var tabs = new String(' ', indent * 2);
 
@@ -77,6 +110,11 @@ namespace Piot.Yaml
 					if(subValue is bool truth)
 					{
 						subValue = truth ? "true" : "false";
+					}
+
+					if(subValue is null || subValue.GetType().IsArray && ((Array)subValue).Length == 0)
+					{
+						subValue = "[]";
 					}
 
 					writer.WriteLine("{0}{1}: {2}", tabs, f.Name, subValue);

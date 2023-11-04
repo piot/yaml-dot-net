@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -16,10 +17,59 @@ namespace Piot.Yaml
 		public interface IFieldOrPropertyTarget
 		{
 			public Type FieldOrPropertyType { get; }
+			public bool NeedsPushDown { get; }
 			public void SetValue(object boxedValue);
-			public void SetValueFromString(string value);
+			public bool SetValueFromString(string value);
 
 			public object ObjectThatHoldsPropertyOrField { get; }
+		}
+
+		public class ListAccumulator : IFieldOrPropertyTarget
+		{
+			private List<object> items = new();
+			private Type itemType;
+			private string debugName;
+
+			public ListAccumulator(Type itemType, string debugName)
+			{
+				this.itemType = itemType;
+				this.debugName = debugName;
+			}
+
+			public override string ToString()
+			{
+				return $"[listacc {itemType} {items.Count}]";
+			}
+
+			public Type FieldOrPropertyType => itemType;
+			public bool NeedsPushDown => false;
+
+			public void SetValue(object boxedValue)
+			{
+				items.Add(boxedValue);
+			}
+
+			public bool SetValueFromString(string value)
+			{
+				if(value.Trim() != "[]")
+				{
+					throw new Exception($"not a valid string for an array/list '{value}'");
+				}
+
+				return true;
+			}
+
+			public object ObjectThatHoldsPropertyOrField
+			{
+				get
+				{
+					// Convert the List<object> to an array of the determined element type
+					var array = Array.CreateInstance(itemType, items.Count);
+					items.ToArray().CopyTo(array, 0);
+
+					return array;
+				}
+			}
 		}
 
 		public class FieldOrPropertyTarget : IFieldOrPropertyTarget
@@ -31,6 +81,8 @@ namespace Piot.Yaml
 
 			public Type FieldOrPropertyType => propertyInfo != null ? propertyInfo.PropertyType :
 				fieldInfo != null ? fieldInfo.FieldType : throw new Exception($"internal error");
+
+			public bool NeedsPushDown => true;
 
 			public FieldOrPropertyTarget(PropertyInfo propertyInfo, FieldInfo fieldInfo, object targetObject,
 				string debugName)
@@ -52,6 +104,11 @@ namespace Piot.Yaml
 
 				ObjectThatHoldsPropertyOrField = targetObject;
 				this.debugName = debugName;
+			}
+
+			public override string ToString()
+			{
+				return $"[propOrField {FieldOrPropertyType.FullName} {debugName} ]";
 			}
 
 			static object GetEnumTypeFromValue(Type enumType, string enumValue)
@@ -98,15 +155,17 @@ namespace Piot.Yaml
 				SetValueInternal(o);
 			}
 
-			public void SetValueFromString(string v)
+			public bool SetValueFromString(string v)
 			{
 				if(fieldOrPropertyType.IsEnum)
 				{
 					SetValueToEnum(v);
-					return;
+					return false;
 				}
 
 				SetValue(v);
+
+				return false;
 			}
 
 			public void SetValue(object v)
@@ -114,6 +173,12 @@ namespace Piot.Yaml
 				if(fieldOrPropertyType.IsEnum)
 				{
 					SetValueToEnum(v);
+					return;
+				}
+
+				if(fieldOrPropertyType.IsArray)
+				{
+					SetValueInternal(v);
 					return;
 				}
 
@@ -159,6 +224,7 @@ namespace Piot.Yaml
 
 		struct Context
 		{
+			public int indent;
 			public IFieldOrPropertyTarget savedPropertyTarget;
 		}
 
@@ -175,7 +241,7 @@ namespace Piot.Yaml
 			var outList = new List<YamlMatch>();
 
 			var variable = @"(?<variable>[a-zA-Z_$][a-zA-Z0-9_$]*\s*:)";
-			var hyphen = @"(?<hyphen>^-\s*$)";
+			var hyphen = @"(?<hyphen>-\s*)";
 			var indent = @"(?<indent>\n+(?<indentspaces>\s{2})*)";
 			var stringMatch = @"(?<string>.*)";
 			var integerMatch = @"(?<integer>\s*[-+]?[1-9]\d*)";
@@ -229,7 +295,43 @@ namespace Piot.Yaml
 			return outList;
 		}
 
-		static IFieldOrPropertyTarget FindFieldOrProperty(object o, string propertyName)
+		void Push()
+		{
+			var context = new Context
+				{ indent = currentIndent, savedPropertyTarget = targetFieldOrProperty };
+
+			contexts.Push(context);
+		}
+
+		IFieldOrPropertyTarget CreateFieldOrPropertyTarget(PropertyInfo propertyInfo, FieldInfo fieldInfo,
+			object o, string debugName)
+		{
+			var foundTarget = new FieldOrPropertyTarget(propertyInfo, fieldInfo, o, debugName);
+
+			if(!foundTarget.FieldOrPropertyType.IsArray)
+			{
+				return foundTarget;
+			}
+
+			targetFieldOrProperty = foundTarget;
+			Push();
+
+			var elementType = foundTarget.FieldOrPropertyType.GetElementType();
+
+			targetObject = null;
+
+			var listAccumulator = new ListAccumulator(elementType, debugName);
+			targetFieldOrProperty = listAccumulator;
+			lastDetectedIndent++;
+
+			var context2 = new Context
+				{ indent = -1, savedPropertyTarget = listAccumulator };
+			contexts.Push(context2);
+
+			return listAccumulator;
+		}
+
+		IFieldOrPropertyTarget FindFieldOrProperty(object o, string propertyName)
 		{
 			var t = o.GetType();
 			FieldInfo foundFieldInfo = null;
@@ -241,7 +343,7 @@ namespace Piot.Yaml
 
 			if(foundPropertyInfo != null || foundFieldInfo != null)
 			{
-				return new FieldOrPropertyTarget(foundPropertyInfo, foundFieldInfo, o, propertyName);
+				return CreateFieldOrPropertyTarget(foundPropertyInfo, foundFieldInfo, o, propertyName);
 			}
 
 			var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -253,7 +355,7 @@ namespace Piot.Yaml
 					(YamlPropertyAttribute)Attribute.GetCustomAttribute(field, typeof(YamlPropertyAttribute));
 				if(attribute.Description == propertyName)
 				{
-					return new FieldOrPropertyTarget(null, field, o, propertyName);
+					return CreateFieldOrPropertyTarget(null, field, o, propertyName);
 				}
 			}
 
@@ -267,15 +369,21 @@ namespace Piot.Yaml
 						typeof(YamlPropertyAttribute));
 				if(attribute.Description == propertyName)
 				{
-					return new FieldOrPropertyTarget(property, null, o, propertyName);
+					return CreateFieldOrPropertyTarget(property, null, o, propertyName);
 				}
 			}
 
-			throw new Exception("Couldn't find property:" + propertyName);
+			throw new Exception(
+				$"Couldn't find property: {propertyName} on object {targetObject} {targetObject.GetType().FullName}");
 		}
 
 		void ParseVariable(string propertyName)
 		{
+			if(targetObject == null)
+			{
+				throw new Exception($"illegal state {propertyName} is on a null object");
+			}
+
 			targetFieldOrProperty = FindFieldOrProperty(targetObject, propertyName);
 		}
 
@@ -284,10 +392,46 @@ namespace Piot.Yaml
 			targetFieldOrProperty.SetValue(v);
 		}
 
+		void ParseHyphen()
+		{
+			var parentFieldOrProperty = contexts.Peek().savedPropertyTarget;
+			if(targetObject != null)
+			{
+				if(parentFieldOrProperty.NeedsPushDown)
+				{
+					throw new Exception($"internal error");
+				}
+
+				parentFieldOrProperty.SetValue(targetObject);
+				if(lastDetectedIndent != currentIndent)
+				{
+					throw new Exception($"wrong hyphen indent {lastDetectedIndent} {currentIndent}");
+				}
+			}
+			else
+			{
+				if(lastDetectedIndent != currentIndent + 1)
+				{
+					throw new Exception($"wrong hyphen indent {lastDetectedIndent} {currentIndent}");
+				}
+			}
+
+			targetObject = Activator.CreateInstance(parentFieldOrProperty.FieldOrPropertyType);
+			if(targetObject == null)
+			{
+				throw new Exception(
+					$"could not create an instance of type {parentFieldOrProperty.FieldOrPropertyType}");
+			}
+		}
+
 
 		void SetStringValue(string v)
 		{
-			targetFieldOrProperty.SetValueFromString(v);
+			var objectIsDone = targetFieldOrProperty.SetValueFromString(v);
+			if(objectIsDone)
+			{
+				PopContext(currentIndent);
+			}
 		}
 
 		void SetIntegerValue(int v)
@@ -300,22 +444,41 @@ namespace Piot.Yaml
 			SetValue(v);
 		}
 
+
 		private void PushDown()
 		{
-			var context = new Context
-				{ savedPropertyTarget = targetFieldOrProperty };
-			contexts.Push(context);
+			Push();
 			targetObject = Activator.CreateInstance(targetFieldOrProperty.FieldOrPropertyType);
+
 			targetFieldOrProperty = null;
 		}
 
-		private void PopContext()
+		private void PopContext(int targetIndent)
 		{
-			for (var i = 0; i < currentIndent - lastDetectedIndent; ++i)
+			while (contexts.Count > 0)
 			{
 				var parentContext = contexts.Pop();
-				parentContext.savedPropertyTarget.SetValue(targetObject);
-				targetObject = parentContext.savedPropertyTarget.ObjectThatHoldsPropertyOrField;
+				var savedPropertyTarget = parentContext.savedPropertyTarget;
+
+				if(targetObject != null)
+				{
+					savedPropertyTarget.SetValue(targetObject);
+				}
+
+				targetObject = savedPropertyTarget.ObjectThatHoldsPropertyOrField;
+				if(targetObject == null)
+				{
+					throw new Exception($"something is wrong with {savedPropertyTarget}");
+				}
+
+				if(targetIndent != parentContext.indent)
+				{
+					continue;
+				}
+
+				targetFieldOrProperty = savedPropertyTarget;
+
+				break;
 			}
 		}
 
@@ -323,11 +486,17 @@ namespace Piot.Yaml
 		{
 			if(lastDetectedIndent == currentIndent + 1)
 			{
-				PushDown();
+				if(targetFieldOrProperty.NeedsPushDown)
+				{
+					PushDown();
+				}
+				else
+				{
+				}
 			}
 			else if(lastDetectedIndent < currentIndent)
 			{
-				PopContext();
+				PopContext(lastDetectedIndent);
 			}
 			else
 			{
@@ -391,6 +560,11 @@ namespace Piot.Yaml
 						break;
 					case "indentspaces":
 						break;
+					case "hyphen":
+
+
+						ParseHyphen();
+						break;
 					case "comment":
 						break;
 					default:
@@ -400,7 +574,7 @@ namespace Piot.Yaml
 
 			lastDetectedIndent = 0;
 
-			PopContext();
+			PopContext(0);
 
 			return (T)targetObject;
 		}
