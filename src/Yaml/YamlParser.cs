@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using System.Text.RegularExpressions;
 
@@ -12,6 +13,121 @@ namespace Piot.Yaml
 {
 	internal class YamlParser
 	{
+		public interface IFieldOrPropertyTarget
+		{
+			public Type FieldOrPropertyType { get; }
+			public void SetValue(object boxedValue);
+			public void SetValueFromString(string value);
+
+			public object ObjectThatHoldsPropertyOrField { get; }
+		}
+
+		public class FieldOrPropertyTarget : IFieldOrPropertyTarget
+		{
+			private readonly PropertyInfo propertyInfo;
+			private readonly FieldInfo fieldInfo;
+			private readonly Type fieldOrPropertyType;
+			private readonly string debugName;
+
+			public Type FieldOrPropertyType => propertyInfo != null ? propertyInfo.PropertyType :
+				fieldInfo != null ? fieldInfo.FieldType : throw new Exception($"internal error");
+
+			public FieldOrPropertyTarget(PropertyInfo propertyInfo, FieldInfo fieldInfo, object targetObject,
+				string debugName)
+			{
+				if(propertyInfo != null)
+				{
+					fieldOrPropertyType = propertyInfo.PropertyType;
+					this.propertyInfo = propertyInfo;
+				}
+				else if(fieldInfo != null)
+				{
+					fieldOrPropertyType = fieldInfo.FieldType;
+					this.fieldInfo = fieldInfo;
+				}
+				else
+				{
+					throw new ArgumentException($"Piot.Yaml: you must provide either a propertyInfo or fieldInfo");
+				}
+
+				ObjectThatHoldsPropertyOrField = targetObject;
+				this.debugName = debugName;
+			}
+
+			void SetValueToEnum(string enumValueString)
+			{
+				object enumValue;
+				try
+				{
+					enumValue = Enum.Parse(fieldOrPropertyType, enumValueString);
+				}
+				catch (ArgumentException e)
+				{
+					throw new ArgumentException(
+						$"PiotYaml: Enum value '{enumValueString} was not found in enum of type {fieldOrPropertyType} {debugName} {e}");
+				}
+
+				SetValueInternal(enumValue);
+			}
+
+			void SetValueToEnum(object o)
+			{
+				SetValueInternal(o);
+			}
+
+			public void SetValueFromString(string v)
+			{
+				if(fieldOrPropertyType.IsEnum)
+				{
+					SetValueToEnum(v);
+					return;
+				}
+
+				SetValue(v);
+			}
+
+			public void SetValue(object v)
+			{
+				if(fieldOrPropertyType.IsEnum)
+				{
+					SetValueToEnum(v);
+					return;
+				}
+
+				object convertedValue;
+				try
+				{
+					convertedValue = Convert.ChangeType(v, fieldOrPropertyType,
+						CultureInfo.InvariantCulture);
+				}
+				catch (FormatException e)
+				{
+					throw new FormatException(
+						$"PiotYaml: Couldn't format {fieldOrPropertyType} value: {v} because {e}");
+				}
+
+				SetValueInternal(convertedValue);
+			}
+
+			void SetValueInternal(object convertedValue)
+			{
+				if(fieldInfo != null)
+				{
+					fieldInfo.SetValue(ObjectThatHoldsPropertyOrField, convertedValue);
+				}
+				else if(propertyInfo != null)
+				{
+					propertyInfo.SetValue(ObjectThatHoldsPropertyOrField, convertedValue, null);
+				}
+				else
+				{
+					throw new Exception("Must have either valid PropertyInfo or FieldInfo");
+				}
+			}
+
+			public object ObjectThatHoldsPropertyOrField { get; }
+		}
+
 		struct YamlMatch
 		{
 			public string groupName;
@@ -20,15 +136,14 @@ namespace Piot.Yaml
 
 		struct Context
 		{
-			public Object o;
-			public PropertyInfo propertyInfo;
-			public FieldInfo fieldInfo;
+			public IFieldOrPropertyTarget savedPropertyTarget;
 		}
 
-		Object targetObject;
 		readonly Stack<Context> contexts = new();
-		PropertyInfo activeProperty;
-		FieldInfo activeField;
+
+		private IFieldOrPropertyTarget targetFieldOrProperty;
+		private object targetObject;
+
 		int currentIndent;
 		private int lastDetectedIndent;
 
@@ -91,89 +206,65 @@ namespace Piot.Yaml
 			return outList;
 		}
 
+		static IFieldOrPropertyTarget FindFieldOrProperty(object o, string propertyName)
+		{
+			var t = o.GetType();
+			FieldInfo foundFieldInfo = null;
+			var foundPropertyInfo = t.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+			if(foundPropertyInfo == null)
+			{
+				foundFieldInfo = t.GetField(propertyName, BindingFlags.Public | BindingFlags.Instance);
+			}
+
+			if(foundPropertyInfo != null || foundFieldInfo != null)
+			{
+				return new FieldOrPropertyTarget(foundPropertyInfo, foundFieldInfo, o, propertyName);
+			}
+
+			var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+			foreach (var field in fields)
+			{
+				var hasAttribute = Attribute.IsDefined(field, typeof(YamlPropertyAttribute));
+				if(!hasAttribute) continue;
+				var attribute =
+					(YamlPropertyAttribute)Attribute.GetCustomAttribute(field, typeof(YamlPropertyAttribute));
+				if(attribute.Description == propertyName)
+				{
+					return new FieldOrPropertyTarget(null, field, o, propertyName);
+				}
+			}
+
+			var properties = t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+			foreach (var property in properties)
+			{
+				var hasAttribute = Attribute.IsDefined(property, typeof(YamlPropertyAttribute));
+				if(!hasAttribute) continue;
+				var attribute =
+					(YamlPropertyAttribute)Attribute.GetCustomAttribute(property,
+						typeof(YamlPropertyAttribute));
+				if(attribute.Description == propertyName)
+				{
+					return new FieldOrPropertyTarget(property, null, o, propertyName);
+				}
+			}
+
+			throw new Exception("Couldn't find property:" + propertyName);
+		}
+
 		void ParseVariable(string propertyName)
 		{
-			var t = targetObject.GetType();
-
-			activeField = null;
-			activeProperty = t.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
-			if(activeProperty == null)
-			{
-				activeField = t.GetField(propertyName, BindingFlags.Public | BindingFlags.Instance);
-			}
-
-			if(activeProperty == null && activeField == null)
-			{
-				var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-				foreach (var field in fields)
-				{
-					var hasAttribute = Attribute.IsDefined(field, typeof(YamlPropertyAttribute));
-					if(hasAttribute)
-					{
-						var attribute =
-							(YamlPropertyAttribute)Attribute.GetCustomAttribute(field, typeof(YamlPropertyAttribute));
-						if(attribute.Description == propertyName)
-						{
-							activeField = field;
-							return;
-						}
-					}
-				}
-
-				var properties = t.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-				foreach (var property in properties)
-				{
-					var hasAttribute = Attribute.IsDefined(property, typeof(YamlPropertyAttribute));
-					if(hasAttribute)
-					{
-						var attribute =
-							(YamlPropertyAttribute)Attribute.GetCustomAttribute(property,
-								typeof(YamlPropertyAttribute));
-						if(attribute.Description == propertyName)
-						{
-							activeProperty = property;
-							return;
-						}
-					}
-				}
-
-				throw new Exception("Couldn't find property:" + propertyName);
-			}
+			targetFieldOrProperty = FindFieldOrProperty(targetObject, propertyName);
 		}
 
 		void SetValue(object v)
 		{
-			if(activeField != null)
-			{
-				object convertedValue;
-				try
-				{
-					convertedValue = Convert.ChangeType(v, activeField.FieldType);
-				}
-				catch (FormatException e)
-				{
-					throw new FormatException(" Couldn't format:" + activeField.Name + " value:" + v.ToString() +
-					                          " because:" + e.ToString());
-				}
-
-				// Console.WriteLine($"set field {activeField} in {targetObject} <- {convertedValue}");
-				activeField.SetValue(targetObject, convertedValue);
-			}
-			else if(activeProperty != null)
-			{
-				var convertedValue = Convert.ChangeType(v, activeProperty.PropertyType);
-				activeProperty.SetValue(targetObject, convertedValue, null);
-				// Console.WriteLine($"set property {targetObject} <- {convertedValue}");
-			}
-			else
-			{
-				throw new Exception("Can not set value in cyberspace!");
-			}
+			targetFieldOrProperty.SetValue(v);
 		}
+
 
 		void SetStringValue(string v)
 		{
-			SetValue(v);
+			targetFieldOrProperty.SetValueFromString(v);
 		}
 
 		void SetIntegerValue(int v)
@@ -189,23 +280,10 @@ namespace Piot.Yaml
 		private void PushDown()
 		{
 			var context = new Context
-				{ o = targetObject, fieldInfo = activeField, propertyInfo = activeProperty };
-//			Console.WriteLine($"pushing context {lastIndent}");
+				{ savedPropertyTarget = targetFieldOrProperty };
 			contexts.Push(context);
-
-			if(activeField != null)
-			{
-				var instance = Activator.CreateInstance(activeField.FieldType);
-				targetObject = instance;
-			}
-			else
-			{
-				var instance = Activator.CreateInstance(activeProperty.PropertyType);
-				targetObject = instance;
-			}
-
-			activeField = null;
-			activeProperty = null;
+			targetObject = Activator.CreateInstance(targetFieldOrProperty.FieldOrPropertyType);
+			targetFieldOrProperty = null;
 		}
 
 		private void PopContext()
@@ -213,20 +291,8 @@ namespace Piot.Yaml
 			for (var i = 0; i < currentIndent - lastDetectedIndent; ++i)
 			{
 				var parentContext = contexts.Pop();
-				if(parentContext.propertyInfo != null)
-				{
-					//Console.WriteLine(
-					//	$"setting to parent class {parentContext.propertyInfo} {parentContext.o}  from value that has been done {targetObject}");
-					parentContext.propertyInfo.SetValue(parentContext.o, targetObject, null);
-				}
-				else if(parentContext.fieldInfo != null)
-				{
-					//Console.WriteLine(
-					//	$"setting to parent object {parentContext.fieldInfo} {parentContext.o} {parentContext.o.GetType().FullName} from value that has been done {targetObject}");
-					parentContext.fieldInfo.SetValue(parentContext.o, targetObject);
-				}
-
-				targetObject = parentContext.o;
+				parentContext.savedPropertyTarget.SetValue(targetObject);
+				targetObject = parentContext.savedPropertyTarget.ObjectThatHoldsPropertyOrField;
 			}
 		}
 
@@ -250,12 +316,8 @@ namespace Piot.Yaml
 
 		public T Parse<T>(string testData)
 		{
-			var root = (T)Activator.CreateInstance(typeof(T));
+			targetObject = (T)Activator.CreateInstance(typeof(T));
 			//var root = (T)FormatterServices.GetUninitializedObject(typeof(T));
-
-			targetObject = root;
-			activeProperty = null;
-			activeField = null;
 
 			var list = FindMatches(testData);
 
@@ -314,6 +376,7 @@ namespace Piot.Yaml
 			}
 
 			lastDetectedIndent = 0;
+
 			PopContext();
 
 			return (T)targetObject;

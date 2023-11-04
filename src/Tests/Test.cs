@@ -37,6 +37,11 @@ namespace tests
 			public uint inDaStruct;
 		}
 
+		public enum SomeEnum
+		{
+			FirstChoice,
+			Second
+		}
 		public struct TestSubKlass
 		{
 			public int answer;
@@ -44,6 +49,7 @@ namespace tests
 			[YamlProperty("anotherAnswer")] public string AnOTHerAnswer { get; set; }
 
 			public SomeClass someClass;
+			public SomeEnum someEnum;
 			public float f;
 		}
 
@@ -106,6 +112,32 @@ props_custom: 'hello,world'
 			Assert.AreEqual(42, o.subClass.answer);
 			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
 		}
+		
+		[Test]
+		public void TestEnum()
+		{
+			var testData =@"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: Second
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Second, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
 
 		[Test]
 		public void TestDeserializeString()
