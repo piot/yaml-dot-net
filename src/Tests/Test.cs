@@ -231,6 +231,52 @@ subClass:
 			Assert.AreEqual(42, o.subClass.someItems[1].x);
 		}
 		
+		
+		[Test]
+		public void TestDeserializeWithMinimalList2()
+		{
+			var testData = @"
+subClass: 
+  someItems:
+    -     x: 399
+    -     x: 42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(399, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+		}
+		
+		
+		[Test]
+		public void TestDeserializeWithMinimalListAndDictionary()
+		{
+			var testData = @"
+props: 'props'
+john: 34
+other: 'other'
+isItTrue: true
+subClass:
+  anotherAnswer: '42'
+  answer: 42
+  someClass:
+    inDaStruct: 1
+  someEnum: FirstChoice
+  someItems:
+    -     x: 399
+    -     x: 42
+  lookup:
+    2:
+      x: 909
+  f: -22.42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(399, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+		}
+
+		
 
 		[Test]
 		public void TestDeserializeWithWrongHyphenList()

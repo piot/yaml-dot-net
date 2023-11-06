@@ -6,6 +6,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Reflection;
@@ -226,6 +227,7 @@ namespace Piot.Yaml
 				object convertedValue;
 				try
 				{
+					Console.WriteLine($"converting {propertyName} into key {keyType.Name}");
 					convertedValue = Convert.ChangeType(propertyName, keyType,
 						CultureInfo.InvariantCulture);
 				}
@@ -484,6 +486,12 @@ namespace Piot.Yaml
 
 		void Push()
 		{
+			if(referenceFieldOrProperty == null)
+			{
+				throw new Exception($"can not push with null reference");
+			}
+
+			Console.WriteLine($"push {referenceFieldOrProperty}");
 			DebugLogStack("push_before");
 			var context = new Context
 			{
@@ -529,21 +537,10 @@ namespace Piot.Yaml
 				var listAccumulator = new ListAccumulator(elementType, debugName);
 				Console.WriteLine($"..we have a list accumulator as target");
 				targetList = listAccumulator;
-				lastDetectedIndent++;
-
-				/*
-				var context2 = new Context
-				{
-					indent = -1,
-					targetContainer = targetContainer,
-					savedList = listAccumulator,
-					savedPropertyReference = referenceFieldOrProperty
-				};
-				contexts.Push(context2);
-				*/
 
 				targetContainer = null;
 				referenceFieldOrProperty = null;
+				currentIndent++;
 
 				return;
 			}
@@ -567,12 +564,13 @@ namespace Piot.Yaml
 				contexts.Push(context2);
 				*/
 
+				targetList = null;
 				targetContainer = dictionaryAccumulator;
+				currentIndent++;
 				Console.WriteLine(
 					$"..we have a dictionary accumulator as target container, but no field or reference  {targetContainer} set {debugName}");
 
 				referenceFieldOrProperty = null;
-				targetList = null;
 			}
 		}
 
@@ -669,7 +667,7 @@ namespace Piot.Yaml
 			}
 			else
 			{
-				if(lastDetectedIndent != currentIndent + 1)
+				if(lastDetectedIndent != currentIndent)
 				{
 					throw new Exception($"wrong hyphen indent {lastDetectedIndent} {currentIndent}");
 				}
@@ -749,6 +747,7 @@ namespace Piot.Yaml
 				Console.WriteLine($"popcontext: add container to list because of we were working on one");
 
 				targetList.Add(targetContainer.ContainerObject);
+				targetContainer = null;
 			}
 		}
 
@@ -773,11 +772,9 @@ namespace Piot.Yaml
 					Console.WriteLine(
 						$"popcontext: set current property reference to container or list object {savedPropertyTarget} <= {ContainerObject}");
 					savedPropertyTarget.SetValue(ContainerObject!.ContainerObject);
-					savedPropertyTarget = null;
 				}
 
 				referenceFieldOrProperty = null;
-
 				targetContainer = parentContext.targetContainer;
 				targetList = parentContext.savedList;
 
@@ -798,11 +795,15 @@ namespace Piot.Yaml
 
 		private void Indent()
 		{
-			if(targetList == null)
+			if(targetList != null && targetContainer == null)
 			{
-				Console.WriteLine($"Indent() with push");
-				Push();
+				// Ignore first indent
+				Console.WriteLine($"Ignore first indent in list");
+				return;
 			}
+
+			Console.WriteLine($"Indent() with push");
+			Push();
 
 			if(referenceFieldOrProperty != null)
 			{
