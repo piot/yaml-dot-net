@@ -741,55 +741,53 @@ namespace Piot.Yaml
 			? targetList
 			: targetContainer ?? throw new Exception($"must have list or container to find object");
 
+
+		private void FinishOngoingListOnDedent()
+		{
+			if(targetList != null && targetContainer != null)
+			{
+				Console.WriteLine($"popcontext: add container to list because of we were working on one");
+
+				targetList.Add(targetContainer.ContainerObject);
+			}
+		}
+
 		private void DedentTo(int targetIndent)
 		{
 			Console.WriteLine($"popping from {currentIndent} to {targetIndent}");
+			FinishOngoingListOnDedent();
 			while (contexts.Count > 0)
 			{
 				DebugLogStack("beforePop");
 				var parentContext = contexts.Pop();
 				var savedPropertyTarget = parentContext.savedPropertyReference;
-				var savedContainer = parentContext.targetContainer;
-				var savedList = parentContext.savedList;
 
 				Console.WriteLine(
 					$"--- popcontext: popped: {parentContext.indent} {parentContext.savedList} {parentContext.targetContainer} {parentContext.savedPropertyReference}");
 
 				DebugLogStack("pop");
 
-				if(targetList != null && targetContainer != null)
-				{
-					Console.WriteLine($"popcontext: add container to list because of we were working on one");
-
-					targetList.Add(targetContainer.ContainerObject);
-				}
-
-				if(savedList != null)
-				{
-					Console.WriteLine(
-						$"PopContext, add to list in progress: {savedList} from container {targetContainer}");
-					savedList.Add(targetContainer.ContainerObject);
-				}
-				else if(savedPropertyTarget != null)
+				// Set to saved property target and clear it
+				if(savedPropertyTarget != null)
 				{
 					Console.WriteLine(
 						$"popcontext: set current property reference to container or list object {savedPropertyTarget} <= {ContainerObject}");
 					savedPropertyTarget.SetValue(ContainerObject!.ContainerObject);
+					savedPropertyTarget = null;
 				}
 
-				targetContainer = savedContainer;
-				if(targetContainer == null)
-				{
-					throw new Exception($"something is wrong with {savedPropertyTarget}");
-				}
-
-				targetList = savedList;
 				referenceFieldOrProperty = null;
 
+				targetContainer = parentContext.targetContainer;
+				targetList = parentContext.savedList;
+
+				if(targetContainer == null && targetList == null)
+				{
+					throw new Exception($"something is wrong with");
+				}
 
 				if(targetIndent == parentContext.indent)
 				{
-					referenceFieldOrProperty = savedPropertyTarget;
 					Console.WriteLine($"done popping");
 
 					break;
