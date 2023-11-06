@@ -300,25 +300,69 @@ namespace Piot.Yaml
 				return null;
 			}
 
-			void SetValueToEnum(string enumValueString)
+			static string GetReflectionEnumNameFromCustom(Type enumType, string enumValue)
+			{
+				foreach (var value in Enum.GetValues(enumType))
+				{
+					var enumFieldInfo = enumType.GetField(value.ToString());
+					var allCustomAttributes =
+						(YamlPropertyAttribute[])enumFieldInfo.GetCustomAttributes(typeof(YamlPropertyAttribute),
+							false);
+					if(allCustomAttributes.Length <= 0) continue;
+					if(allCustomAttributes[0].Description == enumValue)
+					{
+						Console.WriteLine($"found custom lookup {enumValue} => {value.ToString()}");
+						return value.ToString();
+					}
+				}
+
+				return enumValue;
+			}
+
+			static object ParseEnum(Type enumType, string name)
 			{
 				object enumValue;
 				try
 				{
-					enumValue = Enum.Parse(fieldOrPropertyType, enumValueString);
+					enumValue = Enum.Parse(enumType, name);
 				}
 				catch (ArgumentException e)
 				{
-					enumValue = GetEnumTypeFromValue(fieldOrPropertyType, enumValueString);
-					if(enumValue == null)
-					{
-						// try to find it using a value
-						throw new ArgumentException(
-							$"PiotYaml: Enum value '{enumValueString} was not found in enum of type {fieldOrPropertyType} {debugName} {e}");
-					}
+					// try to find it using a value
+					throw new ArgumentException(
+						$"PiotYaml: Enum value '{name} was not found in enum of type {enumType} {name} {e}");
 				}
 
-				SetValueInternal(enumValue);
+				return enumValue;
+			}
+
+			void SetValueToEnum(string enumValueStringRaw)
+			{
+				var enumValueString = enumValueStringRaw.Replace("|", ", ");
+				var enumValues = enumValueString.Split(',');
+				string enumStringToSet;
+				if(enumValues.Length == 0)
+				{
+					enumStringToSet = GetReflectionEnumNameFromCustom(fieldOrPropertyType, enumValueString.Trim());
+				}
+				else
+				{
+					var translated = new string[enumValues.Length];
+
+					var i = 0;
+					foreach (var enumValueWithSpaces in enumValues)
+					{
+						var enumValue = enumValueWithSpaces.Trim();
+						Console.WriteLine($"enum translating to '{enumValue}'");
+						translated[i++] = GetReflectionEnumNameFromCustom(fieldOrPropertyType, enumValue);
+					}
+
+					enumStringToSet = string.Join(", ", translated.ToArray());
+				}
+				Console.WriteLine($"enum translated to '{enumStringToSet}'");
+
+				var enumObject = ParseEnum(fieldOrPropertyType, enumStringToSet);
+				SetValueInternal(enumObject);
 			}
 
 			void SetValueToEnum(object o)

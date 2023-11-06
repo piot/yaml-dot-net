@@ -48,6 +48,7 @@ namespace tests
 			}
 		}
 
+		[Flags]
 		public enum SomeEnum
 		{
 			FirstChoice,
@@ -187,6 +188,81 @@ props_custom: 'hello,world'
 
 
 		[Test]
+		public void TestEnumFlags()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: Second | FirstChoice
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Second | SomeEnum.FirstChoice, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+		[Test]
+		public void TestEnumFlagsWithComma()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: Second,FirstChoice
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Second | SomeEnum.FirstChoice, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+		[Test]
+		public void TestEnumFlagsWithDifferentName()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: Second | _third
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Second | SomeEnum.Third, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+		[Test]
 		public void TestDeserializeWithList()
 		{
 			var testData = @"
@@ -215,7 +291,7 @@ props_custom: 'hello,world'
 			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
 		}
 
-		
+
 		[Test]
 		public void TestDeserializeWithMinimalList()
 		{
@@ -230,8 +306,8 @@ subClass:
 			Assert.AreEqual(23, o.subClass.someItems[0].x);
 			Assert.AreEqual(42, o.subClass.someItems[1].x);
 		}
-		
-		
+
+
 		[Test]
 		public void TestDeserializeWithMinimalList2()
 		{
@@ -246,8 +322,8 @@ subClass:
 			Assert.AreEqual(399, o.subClass.someItems[0].x);
 			Assert.AreEqual(42, o.subClass.someItems[1].x);
 		}
-		
-		
+
+
 		[Test]
 		public void TestDeserializeWithMinimalListAndDictionary()
 		{
@@ -276,7 +352,6 @@ subClass:
 			Assert.AreEqual(42, o.subClass.someItems[1].x);
 		}
 
-		
 
 		[Test]
 		public void TestDeserializeWithWrongHyphenList()
