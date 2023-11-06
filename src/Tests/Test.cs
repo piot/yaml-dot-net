@@ -44,7 +44,7 @@ namespace tests
 
 			public override string ToString()
 			{
-				return $"item:{x}";
+				return $"[SomeItem x:{x}]";
 			}
 		}
 
@@ -64,6 +64,13 @@ namespace tests
 			public SomeClass someClass;
 			public SomeEnum someEnum;
 			public SomeItem[] someItems;
+			public Dictionary<int, SomeItem> lookup;
+
+
+			public override string ToString()
+			{
+				return $"[TestSubKlass {lookup}]";
+			}
 
 			public float f;
 		}
@@ -230,6 +237,24 @@ props_custom: 'hello,world'
 			var o = Assert.Throws<Exception>(() => YamlDeserializer.Deserialize<TestKlass>(testData));
 		}
 
+		[Test]
+		public void TestDeserializeWithDictionary()
+		{
+			var testData = @"
+subClass: 
+  lookup:
+    2:
+      x: 42
+    3:
+      x: 101   
+other: hejsan svejsan
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(42, o.subClass.lookup[2].x);
+			Assert.AreEqual(101, o.subClass.lookup[3].x);
+			Assert.AreEqual("hejsan svejsan", o.other);
+		}
+
 
 		[Test]
 		public void TestDeserializeString()
@@ -333,7 +358,8 @@ subClass:
 			o.subClass.someClass.inDaStruct = 1;
 			o.props = "props";
 			o.isItTrue = true;
-			o.subClass.someItems = new SomeItem[0];
+			o.subClass.someItems = new SomeItem[1];
+			o.subClass.lookup = new();
 
 			o.other = "other";
 			var output = YamlSerializer.Serialize(o);
@@ -359,6 +385,54 @@ subClass:
 			{
 				new() { x = 399 },
 				new() { x = 42 }
+			};
+
+			o.subClass.lookup = new()
+			{
+				{ 2, new() { x = 909 } }
+			};
+
+			o.other = "other";
+			var output = YamlSerializer.Serialize(o);
+			Console.WriteLine("Output:{0}", output);
+			var back = YamlDeserializer.Deserialize<TestKlass>(output);
+			var backOutput = YamlSerializer.Serialize(back);
+			AssertEx.AreEqualByXml(o, back);
+			Assert.AreEqual(output, backOutput);
+		}
+
+
+		[Test]
+		public void TestSerializeWithDictionary()
+		{
+			var o = new TestKlass();
+			o.john = 34;
+			o.subClass = new TestSubKlass();
+			o.subClass.answer = 42;
+			o.subClass.f = -22.42f;
+			o.subClass.someClass.inDaStruct = 1;
+			o.props = "props";
+			o.isItTrue = true;
+			o.subClass.someItems = new SomeItem[]
+			{
+				new() { x = 399 },
+				new() { x = 42 }
+			};
+
+			o.subClass.lookup = new Dictionary<int, SomeItem>()
+			{
+				{
+					1, new()
+					{
+						x = -101
+					}
+				},
+				{
+					-1, new()
+					{
+						x = 99
+					}
+				}
 			};
 
 			o.other = "other";

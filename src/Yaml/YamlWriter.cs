@@ -4,6 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
 
@@ -14,6 +16,11 @@ namespace Piot.Yaml
 		bool IsPrimitive(Type t)
 		{
 			return t.IsPrimitive || t == typeof(Decimal) || t == typeof(String) || t.IsEnum;
+		}
+
+		bool IsDictionary(Type t)
+		{
+			return typeof(IDictionary<,>).IsAssignableFrom(t) || typeof(IDictionary).IsAssignableFrom(t);
 		}
 
 		bool ShouldRecurse(Type t)
@@ -31,12 +38,12 @@ namespace Piot.Yaml
 			return o != null && ShouldRecurse(o.GetType());
 		}
 
-		void WriteEnum(object o, StringWriter writer)
+		void WriteEnum(object o, TextWriter writer)
 		{
 			writer.Write($"{o}");
 		}
 
-		void WriteArray(object o, StringWriter writer, int indent)
+		void WriteArray(object o, TextWriter writer, int indent)
 		{
 			var arr = (Array)o;
 			var tabs = new String(' ', indent * 2);
@@ -48,9 +55,23 @@ namespace Piot.Yaml
 			}
 		}
 
-		void WriteObject(Object o, StringWriter writer, int indent)
+		void WriteDictionary(object o, TextWriter writer, int indent)
+		{
+			var dictionary = (IDictionary)o;
+			var tabs = new String(' ', indent * 2);
+			foreach (var key in dictionary.Keys)
+			{
+				var value = dictionary[key];
+				writer.Write($"{tabs}{key}:\n");
+				WriteObject(value, writer, indent+1);
+			}
+		}
+
+		void WriteObject(Object o, TextWriter writer, int indent)
 		{
 			var t = o.GetType();
+
+			Console.WriteLine($"writing object of type {t.Name} isDictionary: {IsDictionary(t)}");
 			if(t.IsEnum)
 			{
 				WriteEnum(o, writer);
@@ -62,6 +83,13 @@ namespace Piot.Yaml
 				WriteArray(o, writer, indent);
 				return;
 			}
+
+			if(IsDictionary(t))
+			{
+				WriteDictionary(o, writer, indent);
+				return;
+			}
+
 
 			var tabs = new String(' ', indent * 2);
 
@@ -112,7 +140,11 @@ namespace Piot.Yaml
 						subValue = truth ? "true" : "false";
 					}
 
-					if(subValue is null || subValue.GetType().IsArray && ((Array)subValue).Length == 0)
+					if(subValue is null && !IsPrimitive(f.FieldType))
+					{
+						subValue = "{}";
+					}
+					else if(subValue is null || subValue.GetType().IsArray && ((Array)subValue).Length == 0)
 					{
 						subValue = "[]";
 					}

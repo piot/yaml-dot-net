@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -14,42 +15,94 @@ namespace Piot.Yaml
 {
 	internal class YamlParser
 	{
-		public interface IFieldOrPropertyTarget
+		public interface IContainerObject
 		{
-			public Type FieldOrPropertyType { get; }
-			public bool NeedsPushDown { get; }
-			public void SetValue(object boxedValue);
-			public bool SetValueFromString(string value);
-
-			public object ObjectThatHoldsPropertyOrField { get; }
+			public object ContainerObject { get; }
 		}
 
-		public class ListAccumulator : IFieldOrPropertyTarget
+		public interface IFieldOrPropertyReference
 		{
-			private List<object> items = new();
-			private Type itemType;
-			private string debugName;
+			public Type FieldOrPropertyType { get; }
+			public void SetValue(object boxedValue);
+			public bool SetValueFromString(string value);
+		}
 
-			public ListAccumulator(Type itemType, string debugName)
+		public interface ITargetContainer : IContainerObject
+		{
+			// true means that the list was completed by this string
+			public bool SetContainerFromString(string value);
+			
+			public bool SupportsSubObject { get;  }
+
+			public IFieldOrPropertyReference GetReferenceToPropertyFromName(object propertyName);
+		}
+
+		public interface ITargetList : IContainerObject
+		{
+			public void Add(object value);
+
+			// true means that the list was completed by this string
+			public bool AddUsingString(string value);
+
+			public Type ItemType { get; }
+		}
+
+		public class StructOrClassContainer : ITargetContainer
+		{
+			public StructOrClassContainer(object o)
 			{
-				this.itemType = itemType;
-				this.debugName = debugName;
+				ContainerObject = o;
 			}
 
 			public override string ToString()
 			{
-				return $"[listacc {itemType} {items.Count}]";
+				return $"[structOrClass {ContainerObject.GetType().Name} '{ContainerObject}']";
 			}
 
-			public Type FieldOrPropertyType => itemType;
-			public bool NeedsPushDown => false;
-
-			public void SetValue(object boxedValue)
+			public bool SetContainerFromString(string value)
 			{
-				items.Add(boxedValue);
+				throw new NotImplementedException();
 			}
 
-			public bool SetValueFromString(string value)
+			public bool SupportsSubObject => true;
+
+			public IFieldOrPropertyReference GetReferenceToPropertyFromName(object propertyName)
+			{
+				return FindFieldOrProperty(ContainerObject, propertyName as string);
+			}
+
+			public object ContainerObject { get; }
+		}
+
+
+		public class ListAccumulator : ITargetList
+		{
+			private IList list;
+			private Type elementType;
+			private string debugName;
+
+			public ListAccumulator(Type elementType, string debugName)
+			{
+				this.elementType = elementType;
+				this.debugName = debugName;
+				var listType = typeof(List<>).MakeGenericType(elementType);
+				list = (IList)Activator.CreateInstance(listType);
+			}
+
+			public override string ToString()
+			{
+				return $"[listacc {elementType} {list.Count}]";
+			}
+
+			public Type ItemType => elementType;
+
+			public void Add(object boxedValue)
+			{
+				Console.WriteLine($"trying to add {boxedValue.GetType().Name} {boxedValue} to list");
+				list.Add(boxedValue);
+			}
+
+			public bool AddUsingString(string value)
 			{
 				if(value.Trim() != "[]")
 				{
@@ -59,20 +112,137 @@ namespace Piot.Yaml
 				return true;
 			}
 
-			public object ObjectThatHoldsPropertyOrField
+			public IFieldOrPropertyReference FindUsingPropertyName(string propertyName)
+			{
+				throw new NotImplementedException();
+			}
+
+			public object ContainerObject
 			{
 				get
 				{
-					// Convert the List<object> to an array of the determined element type
-					var array = Array.CreateInstance(itemType, items.Count);
-					items.ToArray().CopyTo(array, 0);
-
+					var array = Array.CreateInstance(elementType, list.Count);
+					Console.WriteLine($"created array of {elementType} of length {list.Count}");
+					list.CopyTo(array, 0);
 					return array;
 				}
 			}
 		}
 
-		public class FieldOrPropertyTarget : IFieldOrPropertyTarget
+		public class DictionaryReferenceItem : IFieldOrPropertyReference
+		{
+			private IDictionary dictionary;
+			private object key;
+
+			public DictionaryReferenceItem(IDictionary dictionary, object key, Type valueType)
+			{
+				this.dictionary = dictionary;
+
+				this.key = key;
+
+				FieldOrPropertyType = valueType;
+			}
+
+			public Type FieldOrPropertyType { get; }
+
+
+			public void SetValue(object boxedValue)
+			{
+				object convertedValue;
+				try
+				{
+					convertedValue = Convert.ChangeType(boxedValue, FieldOrPropertyType,
+						CultureInfo.InvariantCulture);
+				}
+				catch (FormatException e)
+				{
+					throw new FormatException(
+						$"PiotYaml: Couldn't format {FieldOrPropertyType} value: {boxedValue} because {e}");
+				}
+
+				Console.WriteLine(
+					$"converting value {boxedValue} {boxedValue.GetType().Name} to {convertedValue} {convertedValue.GetType().Name}");
+				dictionary.Add(key, convertedValue);
+			}
+
+			public bool SetValueFromString(string value)
+			{
+				throw new NotImplementedException();
+			}
+
+			public IFieldOrPropertyReference FindUsingPropertyName(string propertyName)
+			{
+				throw new NotImplementedException();
+			}
+
+			public override string ToString()
+			{
+				return $"[dictRef {key}]";
+			}
+
+			public object ObjectThatHoldsPropertyOrField => dictionary;
+		}
+
+		public class DictionaryAccumulator : ITargetContainer
+		{
+			private IDictionary items;
+			private Type valueType;
+			private Type keyType;
+			private string debugName;
+
+			public DictionaryAccumulator(Type keyType, Type valueType, string debugName)
+			{
+				this.keyType = keyType;
+				this.valueType = valueType;
+				this.debugName = debugName;
+
+				var dictionaryType = typeof(Dictionary<,>).MakeGenericType(keyType, valueType);
+				// Convert the List<object> to an array of the determined element type
+				items = (IDictionary)Activator.CreateInstance(dictionaryType);
+			}
+
+			public override string ToString()
+			{
+				return $"[dict {keyType} {valueType} {items.Count}]";
+			}
+
+			public Type FieldOrPropertyType => valueType;
+
+
+			public bool SetContainerFromString(string value)
+			{
+				if(value.Trim() != "{}")
+				{
+					throw new Exception($"not a valid string for an dictionary '{value}'");
+				}
+
+				return true;
+			}
+
+			public bool SupportsSubObject => false;
+
+			public IFieldOrPropertyReference GetReferenceToPropertyFromName(object propertyName)
+			{
+				object convertedValue;
+				try
+				{
+					convertedValue = Convert.ChangeType(propertyName, keyType,
+						CultureInfo.InvariantCulture);
+				}
+				catch (FormatException e)
+				{
+					throw new FormatException(
+						$"PiotYaml: Couldn't format {keyType} value: {propertyName} because {e}");
+				}
+
+				return new DictionaryReferenceItem(items, convertedValue, valueType);
+			}
+
+			public object ContainerObject => items;
+		}
+
+
+		public class FieldOrPropertyReference : IFieldOrPropertyReference
 		{
 			private readonly PropertyInfo propertyInfo;
 			private readonly FieldInfo fieldInfo;
@@ -82,9 +252,8 @@ namespace Piot.Yaml
 			public Type FieldOrPropertyType => propertyInfo != null ? propertyInfo.PropertyType :
 				fieldInfo != null ? fieldInfo.FieldType : throw new Exception($"internal error");
 
-			public bool NeedsPushDown => true;
 
-			public FieldOrPropertyTarget(PropertyInfo propertyInfo, FieldInfo fieldInfo, object targetObject,
+			public FieldOrPropertyReference(PropertyInfo propertyInfo, FieldInfo fieldInfo, object targetObject,
 				string debugName)
 			{
 				if(propertyInfo != null)
@@ -168,6 +337,11 @@ namespace Piot.Yaml
 				return false;
 			}
 
+			public IFieldOrPropertyReference FindUsingPropertyName(string propertyName)
+			{
+				throw new NotImplementedException();
+			}
+
 			public void SetValue(object v)
 			{
 				if(fieldOrPropertyType.IsEnum)
@@ -225,13 +399,16 @@ namespace Piot.Yaml
 		struct Context
 		{
 			public int indent;
-			public IFieldOrPropertyTarget savedPropertyTarget;
+			public IFieldOrPropertyReference savedPropertyReference;
+			public ITargetList savedList;
+			public ITargetContainer targetContainer;
 		}
 
 		readonly Stack<Context> contexts = new();
 
-		private IFieldOrPropertyTarget targetFieldOrProperty;
-		private object targetObject;
+		private IFieldOrPropertyReference referenceFieldOrProperty;
+		private ITargetList targetList;
+		private ITargetContainer targetContainer;
 
 		int currentIndent;
 		private int lastDetectedIndent;
@@ -240,8 +417,8 @@ namespace Piot.Yaml
 		{
 			var outList = new List<YamlMatch>();
 
-			var variable = @"(?<variable>[a-zA-Z_$][a-zA-Z0-9_$]*\s*:)";
-			var hyphen = @"(?<hyphen>-\s*)";
+			var variable = @"(?<variable>[a-zA-Z0-9_$]*\s*:)";
+			var hyphen = @"(?<hyphen>- \s*)";
 			var indent = @"(?<indent>\n+(?<indentspaces>\s{2})*)";
 			var stringMatch = @"(?<string>.*)";
 			var integerMatch = @"(?<integer>\s*[-+]?[1-9]\d*)";
@@ -295,43 +472,112 @@ namespace Piot.Yaml
 			return outList;
 		}
 
+		void DebugLogStack(string debug)
+		{
+			Console.WriteLine($"stack: {debug} {contexts.Count}");
+			foreach (var x in contexts.ToArray())
+			{
+				Console.WriteLine(
+					$"*** {x.indent} list: {x.savedList} container: {x.targetContainer} propertyReference {x.savedPropertyReference}");
+			}
+		}
+
 		void Push()
 		{
+			DebugLogStack("push_before");
 			var context = new Context
-				{ indent = currentIndent, savedPropertyTarget = targetFieldOrProperty };
+			{
+				indent = currentIndent,
+				targetContainer = targetContainer,
+				savedPropertyReference = referenceFieldOrProperty,
+				savedList = targetList
+			};
 
 			contexts.Push(context);
+
+			DebugLogStack("pushed");
 		}
 
-		IFieldOrPropertyTarget CreateFieldOrPropertyTarget(PropertyInfo propertyInfo, FieldInfo fieldInfo,
-			object o, string debugName)
-		{
-			var foundTarget = new FieldOrPropertyTarget(propertyInfo, fieldInfo, o, debugName);
 
-			if(!foundTarget.FieldOrPropertyType.IsArray)
+		static bool CheckForDictionary(Type type, out Type keyType, out Type valueType)
+		{
+			if(type.IsGenericType && type.GetGenericTypeDefinition() == typeof(Dictionary<,>))
 			{
-				return foundTarget;
+				var typeArguments = type.GetGenericArguments();
+				keyType = typeArguments[0];
+				valueType = typeArguments[1];
+				return true;
 			}
 
-			targetFieldOrProperty = foundTarget;
-			Push();
+			keyType = default;
+			valueType = default;
 
-			var elementType = foundTarget.FieldOrPropertyType.GetElementType();
-
-			targetObject = null;
-
-			var listAccumulator = new ListAccumulator(elementType, debugName);
-			targetFieldOrProperty = listAccumulator;
-			lastDetectedIndent++;
-
-			var context2 = new Context
-				{ indent = -1, savedPropertyTarget = listAccumulator };
-			contexts.Push(context2);
-
-			return listAccumulator;
+			return false;
 		}
 
-		IFieldOrPropertyTarget FindFieldOrProperty(object o, string propertyName)
+		void PushExtraDependingOnFieldOrPropertyReference(string debugName)
+		{
+			var foundType = referenceFieldOrProperty.FieldOrPropertyType;
+			if(foundType.IsArray)
+			{
+				Console.WriteLine($"push because of array");
+				Push();
+
+				var elementType = foundType.GetElementType();
+
+
+				var listAccumulator = new ListAccumulator(elementType, debugName);
+				Console.WriteLine($"..we have a list accumulator as target");
+				targetList = listAccumulator;
+				lastDetectedIndent++;
+
+				/*
+				var context2 = new Context
+				{
+					indent = -1,
+					targetContainer = targetContainer,
+					savedList = listAccumulator,
+					savedPropertyReference = referenceFieldOrProperty
+				};
+				contexts.Push(context2);
+				*/
+
+				targetContainer = null;
+				referenceFieldOrProperty = null;
+
+				return;
+			}
+
+			if(CheckForDictionary(foundType, out var keyType, out var valueType))
+			{
+				Console.WriteLine($"push because of dictionary");
+
+				Push();
+
+				var dictionaryAccumulator = new DictionaryAccumulator(keyType, valueType, debugName);
+
+				/*
+				lastDetectedIndent++;
+
+				var context2 = new Context
+				{
+					indent = -1, targetContainer = dictionaryAccumulator,
+					savedPropertyReference = referenceFieldOrProperty, savedList = targetList
+				};
+				contexts.Push(context2);
+				*/
+
+				targetContainer = dictionaryAccumulator;
+				Console.WriteLine(
+					$"..we have a dictionary accumulator as target container, but no field or reference  {targetContainer} set {debugName}");
+
+				referenceFieldOrProperty = null;
+				targetList = null;
+			}
+		}
+
+
+		static IFieldOrPropertyReference FindFieldOrProperty(object o, string propertyName)
 		{
 			var t = o.GetType();
 			FieldInfo foundFieldInfo = null;
@@ -343,7 +589,7 @@ namespace Piot.Yaml
 
 			if(foundPropertyInfo != null || foundFieldInfo != null)
 			{
-				return CreateFieldOrPropertyTarget(foundPropertyInfo, foundFieldInfo, o, propertyName);
+				return new FieldOrPropertyReference(foundPropertyInfo, foundFieldInfo, o, propertyName);
 			}
 
 			var fields = t.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
@@ -355,7 +601,7 @@ namespace Piot.Yaml
 					(YamlPropertyAttribute)Attribute.GetCustomAttribute(field, typeof(YamlPropertyAttribute));
 				if(attribute.Description == propertyName)
 				{
-					return CreateFieldOrPropertyTarget(null, field, o, propertyName);
+					return new FieldOrPropertyReference(null, field, o, propertyName);
 				}
 			}
 
@@ -369,44 +615,57 @@ namespace Piot.Yaml
 						typeof(YamlPropertyAttribute));
 				if(attribute.Description == propertyName)
 				{
-					return CreateFieldOrPropertyTarget(property, null, o, propertyName);
+					return new FieldOrPropertyReference(property, null, o, propertyName);
 				}
 			}
 
 			throw new Exception(
-				$"Couldn't find property: {propertyName} on object {targetObject} {targetObject.GetType().FullName}");
+				$"Couldn't find property: {propertyName} on object {o} {o.GetType().FullName}");
 		}
 
-		void ParseVariable(string propertyName)
+		void SetReferenceToPropertyName(object propertyName)
 		{
-			if(targetObject == null)
+			if(targetContainer == null)
 			{
 				throw new Exception($"illegal state {propertyName} is on a null object");
 			}
 
-			targetFieldOrProperty = FindFieldOrProperty(targetObject, propertyName);
+			Console.WriteLine(
+				$"trying to find property '{propertyName}' {propertyName.GetType().Name} in container {targetContainer}");
+			
+			referenceFieldOrProperty = targetContainer.GetReferenceToPropertyFromName(propertyName);
+
+			Console.WriteLine($"we found reference {referenceFieldOrProperty} in container {targetContainer}");
+
+
+			PushExtraDependingOnFieldOrPropertyReference(propertyName.ToString());
+
+			Console.WriteLine($"Container is now {targetContainer} and {referenceFieldOrProperty}");
 		}
+
 
 		void SetValue(object v)
 		{
-			targetFieldOrProperty.SetValue(v);
+			referenceFieldOrProperty.SetValue(v);
 		}
 
 		void ParseHyphen()
 		{
-			var parentFieldOrProperty = contexts.Peek().savedPropertyTarget;
-			if(targetObject != null)
+			if(targetList == null)
 			{
-				if(parentFieldOrProperty.NeedsPushDown)
-				{
-					throw new Exception($"internal error");
-				}
+				throw new Exception($"internal error. Tried to add an item, but there is no known active list");
+			}
 
-				parentFieldOrProperty.SetValue(targetObject);
+			if(targetContainer != null)
+			{
+				Console.WriteLine($"add container to list because of hyphen");
+				targetList.Add(targetContainer.ContainerObject);
 				if(lastDetectedIndent != currentIndent)
 				{
 					throw new Exception($"wrong hyphen indent {lastDetectedIndent} {currentIndent}");
 				}
+
+				targetContainer = null;
 			}
 			else
 			{
@@ -416,19 +675,37 @@ namespace Piot.Yaml
 				}
 			}
 
-			targetObject = Activator.CreateInstance(parentFieldOrProperty.FieldOrPropertyType);
-			if(targetObject == null)
+			targetContainer =
+				new StructOrClassContainer(Activator.CreateInstance(targetList.ItemType));
+			if(targetContainer == null)
 			{
 				throw new Exception(
-					$"could not create an instance of type {parentFieldOrProperty.FieldOrPropertyType}");
+					$"could not create an instance of type {targetList.ItemType}");
 			}
 		}
 
 
 		void SetStringValue(string v)
 		{
-			var objectIsDone = targetFieldOrProperty.SetValueFromString(v);
-			if(objectIsDone)
+			Console.WriteLine($"trying to set a string '{v}'");
+
+			var containerOrPropertyIsDone = false;
+
+			if(targetContainer != null && referenceFieldOrProperty == null)
+			{
+				containerOrPropertyIsDone = targetContainer.SetContainerFromString(v);
+			}
+			else
+			{
+				if(referenceFieldOrProperty == null)
+				{
+					throw new Exception($"referenceFieldOrProperty is null");
+				}
+
+				containerOrPropertyIsDone = referenceFieldOrProperty.SetValueFromString(v);
+			}
+
+			if(containerOrPropertyIsDone)
 			{
 				PopContext(currentIndent);
 			}
@@ -436,7 +713,22 @@ namespace Piot.Yaml
 
 		void SetIntegerValue(int v)
 		{
-			SetValue(v);
+			if(referenceFieldOrProperty != null)
+			{
+				Console.WriteLine($"integer. found referenceField {referenceFieldOrProperty} <=  {v}");
+				SetValue(v);
+			}
+			else if(targetContainer != null)
+			{
+				Console.WriteLine(
+					$"no valid reference field, it must be a key '{v}'. for a container {targetContainer}");
+				object o = v;
+				SetReferenceToPropertyName(o);
+			}
+			else
+			{
+				throw new Exception($"unexpected integer {v}");
+			}
 		}
 
 		void SetUnsignedIntegerValue(ulong v)
@@ -448,50 +740,86 @@ namespace Piot.Yaml
 		private void PushDown()
 		{
 			Push();
-			targetObject = Activator.CreateInstance(targetFieldOrProperty.FieldOrPropertyType);
 
-			targetFieldOrProperty = null;
+			if(referenceFieldOrProperty != null)
+			{
+				targetContainer =
+					new StructOrClassContainer(Activator.CreateInstance(referenceFieldOrProperty.FieldOrPropertyType));
+			}
+
+			referenceFieldOrProperty = null;
 		}
+
+
+		private IContainerObject ContainerObject => targetList != null
+			? targetList
+			: targetContainer ?? throw new Exception($"must have list or container to find object");
 
 		private void PopContext(int targetIndent)
 		{
+			Console.WriteLine($"popping from {currentIndent} to {targetIndent}");
 			while (contexts.Count > 0)
 			{
+				DebugLogStack("beforePop");
 				var parentContext = contexts.Pop();
-				var savedPropertyTarget = parentContext.savedPropertyTarget;
+				var savedPropertyTarget = parentContext.savedPropertyReference;
+				var savedContainer = parentContext.targetContainer;
+				var savedList = parentContext.savedList;
 
-				if(targetObject != null)
+				Console.WriteLine($"--- popcontext: popped: {parentContext.indent} {parentContext.savedList} {parentContext.targetContainer} {parentContext.savedPropertyReference}");
+				
+				DebugLogStack("pop");
+				
+				if(targetList != null && targetContainer != null)
 				{
-					savedPropertyTarget.SetValue(targetObject);
+					Console.WriteLine($"popcontext: add container to list because of we were working on one");
+
+					targetList.Add(targetContainer.ContainerObject);
 				}
 
-				targetObject = savedPropertyTarget.ObjectThatHoldsPropertyOrField;
-				if(targetObject == null)
+				if(savedList != null)
+				{
+					Console.WriteLine(
+						$"PopContext, add to list in progress: {savedList} from container {targetContainer}");
+					savedList.Add(targetContainer.ContainerObject);
+				}
+				else if(savedPropertyTarget != null)
+				{
+					Console.WriteLine(
+						$"popcontext: set current property reference to container or list object {savedPropertyTarget} <= {ContainerObject}");
+					savedPropertyTarget.SetValue(ContainerObject!.ContainerObject);
+				}
+
+				targetContainer = savedContainer;
+				if(targetContainer == null)
 				{
 					throw new Exception($"something is wrong with {savedPropertyTarget}");
 				}
 
-				if(targetIndent != parentContext.indent)
+				targetList = savedList;
+				referenceFieldOrProperty = null;
+
+		
+
+				if(targetIndent == parentContext.indent)
 				{
-					continue;
+					referenceFieldOrProperty = savedPropertyTarget;
+					Console.WriteLine($"done popping");
+
+					break;
 				}
-
-				targetFieldOrProperty = savedPropertyTarget;
-
-				break;
 			}
 		}
 
 		private void SetIndent()
 		{
+			Console.WriteLine($"moving from {currentIndent} to {lastDetectedIndent} indent");
 			if(lastDetectedIndent == currentIndent + 1)
 			{
-				if(targetFieldOrProperty.NeedsPushDown)
+//				if(targetList != null)
 				{
+					Console.WriteLine($"targetContainer {targetContainer} wants us to push onto stack");
 					PushDown();
-				}
-				else
-				{
 				}
 			}
 			else if(lastDetectedIndent < currentIndent)
@@ -508,13 +836,17 @@ namespace Piot.Yaml
 
 		public T Parse<T>(string testData)
 		{
-			targetObject = (T)Activator.CreateInstance(typeof(T));
+			var rootObject = (T)Activator.CreateInstance(typeof(T));
+			targetContainer = new StructOrClassContainer(rootObject);
+			referenceFieldOrProperty = null;
+
 			//var root = (T)FormatterServices.GetUninitializedObject(typeof(T));
 
 			var list = FindMatches(testData);
 
 			foreach (var item in list)
 			{
+				Console.WriteLine($"parsing '{item.groupName}' {item.value}");
 				switch (item.groupName)
 				{
 					case "variable":
@@ -523,7 +855,7 @@ namespace Piot.Yaml
 							SetIndent();
 						}
 
-						ParseVariable(item.value.Substring(0, item.value.Length - 1).Trim());
+						SetReferenceToPropertyName(item.value.Substring(0, item.value.Length - 1).Trim());
 						break;
 					case "integer":
 						var integerValue = int.Parse(item.value);
@@ -546,8 +878,8 @@ namespace Piot.Yaml
 							s = s.Substring(1, s.Length - 2);
 						}
 
-						SetStringValue(s);
 
+						SetStringValue(s);
 						break;
 					case "float":
 						SetValue(item.value);
@@ -557,6 +889,7 @@ namespace Piot.Yaml
 						break;
 					case "indent":
 						lastDetectedIndent = (item.value.Length - 1) / 2;
+						Console.WriteLine($"detected indent {lastDetectedIndent}");
 						break;
 					case "indentspaces":
 						break;
@@ -576,7 +909,7 @@ namespace Piot.Yaml
 
 			PopContext(0);
 
-			return (T)targetObject;
+			return (T)targetContainer.ContainerObject;
 		}
 	}
 }
