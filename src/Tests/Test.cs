@@ -215,6 +215,22 @@ props_custom: 'hello,world'
 			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
 		}
 
+		
+		[Test]
+		public void TestDeserializeWithMinimalList()
+		{
+			var testData = @"
+subClass: 
+  someItems:
+    - x: 23
+    - x: 42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(23, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+		}
+		
 
 		[Test]
 		public void TestDeserializeWithWrongHyphenList()

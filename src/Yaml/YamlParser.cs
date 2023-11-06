@@ -31,8 +31,8 @@ namespace Piot.Yaml
 		{
 			// true means that the list was completed by this string
 			public bool SetContainerFromString(string value);
-			
-			public bool SupportsSubObject { get;  }
+
+			public bool SupportsSubObject { get; }
 
 			public IFieldOrPropertyReference GetReferenceToPropertyFromName(object propertyName);
 		}
@@ -632,7 +632,7 @@ namespace Piot.Yaml
 
 			Console.WriteLine(
 				$"trying to find property '{propertyName}' {propertyName.GetType().Name} in container {targetContainer}");
-			
+
 			referenceFieldOrProperty = targetContainer.GetReferenceToPropertyFromName(propertyName);
 
 			Console.WriteLine($"we found reference {referenceFieldOrProperty} in container {targetContainer}");
@@ -707,7 +707,7 @@ namespace Piot.Yaml
 
 			if(containerOrPropertyIsDone)
 			{
-				PopContext(currentIndent);
+				DedentTo(currentIndent);
 			}
 		}
 
@@ -737,25 +737,11 @@ namespace Piot.Yaml
 		}
 
 
-		private void PushDown()
-		{
-			Push();
-
-			if(referenceFieldOrProperty != null)
-			{
-				targetContainer =
-					new StructOrClassContainer(Activator.CreateInstance(referenceFieldOrProperty.FieldOrPropertyType));
-			}
-
-			referenceFieldOrProperty = null;
-		}
-
-
 		private IContainerObject ContainerObject => targetList != null
 			? targetList
 			: targetContainer ?? throw new Exception($"must have list or container to find object");
 
-		private void PopContext(int targetIndent)
+		private void DedentTo(int targetIndent)
 		{
 			Console.WriteLine($"popping from {currentIndent} to {targetIndent}");
 			while (contexts.Count > 0)
@@ -766,10 +752,11 @@ namespace Piot.Yaml
 				var savedContainer = parentContext.targetContainer;
 				var savedList = parentContext.savedList;
 
-				Console.WriteLine($"--- popcontext: popped: {parentContext.indent} {parentContext.savedList} {parentContext.targetContainer} {parentContext.savedPropertyReference}");
-				
+				Console.WriteLine(
+					$"--- popcontext: popped: {parentContext.indent} {parentContext.savedList} {parentContext.targetContainer} {parentContext.savedPropertyReference}");
+
 				DebugLogStack("pop");
-				
+
 				if(targetList != null && targetContainer != null)
 				{
 					Console.WriteLine($"popcontext: add container to list because of we were working on one");
@@ -799,7 +786,6 @@ namespace Piot.Yaml
 				targetList = savedList;
 				referenceFieldOrProperty = null;
 
-		
 
 				if(targetIndent == parentContext.indent)
 				{
@@ -811,24 +797,39 @@ namespace Piot.Yaml
 			}
 		}
 
-		private void SetIndent()
+
+		private void Indent()
+		{
+			if(targetList == null)
+			{
+				Console.WriteLine($"Indent() with push");
+				Push();
+			}
+
+			if(referenceFieldOrProperty != null)
+			{
+				targetContainer =
+					new StructOrClassContainer(Activator.CreateInstance(referenceFieldOrProperty.FieldOrPropertyType));
+			}
+
+			referenceFieldOrProperty = null;
+		}
+
+
+		private void SetIndentation()
 		{
 			Console.WriteLine($"moving from {currentIndent} to {lastDetectedIndent} indent");
 			if(lastDetectedIndent == currentIndent + 1)
 			{
-//				if(targetList != null)
-				{
-					Console.WriteLine($"targetContainer {targetContainer} wants us to push onto stack");
-					PushDown();
-				}
+				Indent();
 			}
 			else if(lastDetectedIndent < currentIndent)
 			{
-				PopContext(lastDetectedIndent);
+				DedentTo(lastDetectedIndent);
 			}
 			else
 			{
-				throw new Exception("Illegal indent:" + lastDetectedIndent + " current:" + currentIndent);
+				throw new Exception("Illegal indentation:" + lastDetectedIndent + " current:" + currentIndent);
 			}
 
 			currentIndent = lastDetectedIndent;
@@ -852,7 +853,7 @@ namespace Piot.Yaml
 					case "variable":
 						if(lastDetectedIndent != currentIndent)
 						{
-							SetIndent();
+							SetIndentation();
 						}
 
 						SetReferenceToPropertyName(item.value.Substring(0, item.value.Length - 1).Trim());
@@ -907,7 +908,7 @@ namespace Piot.Yaml
 
 			lastDetectedIndent = 0;
 
-			PopContext(0);
+			DedentTo(0);
 
 			return (T)targetContainer.ContainerObject;
 		}
