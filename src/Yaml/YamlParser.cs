@@ -99,7 +99,6 @@ namespace Piot.Yaml
 
 			public void Add(object boxedValue)
 			{
-				Console.WriteLine($"trying to add {boxedValue.GetType().Name} {boxedValue} to list");
 				list.Add(boxedValue);
 			}
 
@@ -123,7 +122,6 @@ namespace Piot.Yaml
 				get
 				{
 					var array = Array.CreateInstance(elementType, list.Count);
-					Console.WriteLine($"created array of {elementType} of length {list.Count}");
 					list.CopyTo(array, 0);
 					return array;
 				}
@@ -161,8 +159,6 @@ namespace Piot.Yaml
 						$"PiotYaml: Couldn't format {FieldOrPropertyType} value: {boxedValue} because {e}");
 				}
 
-				Console.WriteLine(
-					$"converting value {boxedValue} {boxedValue.GetType().Name} to {convertedValue} {convertedValue.GetType().Name}");
 				dictionary.Add(key, convertedValue);
 			}
 
@@ -227,7 +223,6 @@ namespace Piot.Yaml
 				object convertedValue;
 				try
 				{
-					Console.WriteLine($"converting {propertyName} into key {keyType.Name}");
 					convertedValue = Convert.ChangeType(propertyName, keyType,
 						CultureInfo.InvariantCulture);
 				}
@@ -311,7 +306,6 @@ namespace Piot.Yaml
 					if(allCustomAttributes.Length <= 0) continue;
 					if(allCustomAttributes[0].Description == enumValue)
 					{
-						Console.WriteLine($"found custom lookup {enumValue} => {value.ToString()}");
 						return value.ToString();
 					}
 				}
@@ -353,13 +347,11 @@ namespace Piot.Yaml
 					foreach (var enumValueWithSpaces in enumValues)
 					{
 						var enumValue = enumValueWithSpaces.Trim();
-						Console.WriteLine($"enum translating to '{enumValue}'");
 						translated[i++] = GetReflectionEnumNameFromCustom(fieldOrPropertyType, enumValue);
 					}
 
 					enumStringToSet = string.Join(", ", translated.ToArray());
 				}
-				Console.WriteLine($"enum translated to '{enumStringToSet}'");
 
 				var enumObject = ParseEnum(fieldOrPropertyType, enumStringToSet);
 				SetValueInternal(enumObject);
@@ -518,6 +510,7 @@ namespace Piot.Yaml
 			return outList;
 		}
 
+		/*
 		void DebugLogStack(string debug)
 		{
 			Console.WriteLine($"stack: {debug} {contexts.Count}");
@@ -527,6 +520,7 @@ namespace Piot.Yaml
 					$"*** {x.indent} list: {x.savedList} container: {x.targetContainer} propertyReference {x.savedPropertyReference}");
 			}
 		}
+		*/
 
 		void Push()
 		{
@@ -535,8 +529,6 @@ namespace Piot.Yaml
 				throw new Exception($"can not push with null reference");
 			}
 
-			Console.WriteLine($"push {referenceFieldOrProperty}");
-			DebugLogStack("push_before");
 			var context = new Context
 			{
 				indent = currentIndent,
@@ -546,8 +538,6 @@ namespace Piot.Yaml
 			};
 
 			contexts.Push(context);
-
-			DebugLogStack("pushed");
 		}
 
 
@@ -572,14 +562,12 @@ namespace Piot.Yaml
 			var foundType = referenceFieldOrProperty.FieldOrPropertyType;
 			if(foundType.IsArray)
 			{
-				Console.WriteLine($"push because of array");
 				Push();
 
 				var elementType = foundType.GetElementType();
 
 
 				var listAccumulator = new ListAccumulator(elementType, debugName);
-				Console.WriteLine($"..we have a list accumulator as target");
 				targetList = listAccumulator;
 
 				targetContainer = null;
@@ -591,29 +579,12 @@ namespace Piot.Yaml
 
 			if(CheckForDictionary(foundType, out var keyType, out var valueType))
 			{
-				Console.WriteLine($"push because of dictionary");
-
 				Push();
 
 				var dictionaryAccumulator = new DictionaryAccumulator(keyType, valueType, debugName);
-
-				/*
-				lastDetectedIndent++;
-
-				var context2 = new Context
-				{
-					indent = -1, targetContainer = dictionaryAccumulator,
-					savedPropertyReference = referenceFieldOrProperty, savedList = targetList
-				};
-				contexts.Push(context2);
-				*/
-
 				targetList = null;
 				targetContainer = dictionaryAccumulator;
 				currentIndent++;
-				Console.WriteLine(
-					$"..we have a dictionary accumulator as target container, but no field or reference  {targetContainer} set {debugName}");
-
 				referenceFieldOrProperty = null;
 			}
 		}
@@ -672,17 +643,8 @@ namespace Piot.Yaml
 				throw new Exception($"illegal state {propertyName} is on a null object");
 			}
 
-			Console.WriteLine(
-				$"trying to find property '{propertyName}' {propertyName.GetType().Name} in container {targetContainer}");
-
 			referenceFieldOrProperty = targetContainer.GetReferenceToPropertyFromName(propertyName);
-
-			Console.WriteLine($"we found reference {referenceFieldOrProperty} in container {targetContainer}");
-
-
 			PushExtraDependingOnFieldOrPropertyReference(propertyName.ToString());
-
-			Console.WriteLine($"Container is now {targetContainer} and {referenceFieldOrProperty}");
 		}
 
 
@@ -693,6 +655,9 @@ namespace Piot.Yaml
 
 		void ParseHyphen()
 		{
+			// The hyphen and space should be ignored when it comes to the lastDetectedIndent, so just increase it
+			lastDetectedIndent++;
+
 			if(targetList == null)
 			{
 				throw new Exception($"internal error. Tried to add an item, but there is no known active list");
@@ -700,18 +665,17 @@ namespace Piot.Yaml
 
 			if(targetContainer != null)
 			{
-				Console.WriteLine($"add container to list because of hyphen");
 				targetList.Add(targetContainer.ContainerObject);
 				if(lastDetectedIndent != currentIndent)
 				{
-					throw new Exception($"wrong hyphen indent {lastDetectedIndent} {currentIndent}");
+					throw new Exception($"wrong hyphen indent in container {lastDetectedIndent} {currentIndent}");
 				}
 
 				targetContainer = null;
 			}
 			else
 			{
-				if(lastDetectedIndent != currentIndent)
+				if(lastDetectedIndent != currentIndent + 1)
 				{
 					throw new Exception($"wrong hyphen indent {lastDetectedIndent} {currentIndent}");
 				}
@@ -729,8 +693,6 @@ namespace Piot.Yaml
 
 		void SetStringValue(string v)
 		{
-			Console.WriteLine($"trying to set a string '{v}'");
-
 			var containerOrPropertyIsDone = false;
 
 			if(targetContainer != null && referenceFieldOrProperty == null)
@@ -757,13 +719,10 @@ namespace Piot.Yaml
 		{
 			if(referenceFieldOrProperty != null)
 			{
-				Console.WriteLine($"integer. found referenceField {referenceFieldOrProperty} <=  {v}");
 				SetValue(v);
 			}
 			else if(targetContainer != null)
 			{
-				Console.WriteLine(
-					$"no valid reference field, it must be a key '{v}'. for a container {targetContainer}");
 				object o = v;
 				SetReferenceToPropertyName(o);
 			}
@@ -788,8 +747,6 @@ namespace Piot.Yaml
 		{
 			if(targetList != null && targetContainer != null)
 			{
-				Console.WriteLine($"popcontext: add container to list because of we were working on one");
-
 				targetList.Add(targetContainer.ContainerObject);
 				targetContainer = null;
 			}
@@ -797,24 +754,15 @@ namespace Piot.Yaml
 
 		private void DedentTo(int targetIndent)
 		{
-			Console.WriteLine($"popping from {currentIndent} to {targetIndent}");
 			FinishOngoingListOnDedent();
 			while (contexts.Count > 0)
 			{
-				DebugLogStack("beforePop");
 				var parentContext = contexts.Pop();
 				var savedPropertyTarget = parentContext.savedPropertyReference;
-
-				Console.WriteLine(
-					$"--- popcontext: popped: {parentContext.indent} {parentContext.savedList} {parentContext.targetContainer} {parentContext.savedPropertyReference}");
-
-				DebugLogStack("pop");
 
 				// Set to saved property target and clear it
 				if(savedPropertyTarget != null)
 				{
-					Console.WriteLine(
-						$"popcontext: set current property reference to container or list object {savedPropertyTarget} <= {ContainerObject}");
 					savedPropertyTarget.SetValue(ContainerObject!.ContainerObject);
 				}
 
@@ -829,8 +777,6 @@ namespace Piot.Yaml
 
 				if(targetIndent == parentContext.indent)
 				{
-					Console.WriteLine($"done popping");
-
 					break;
 				}
 			}
@@ -839,14 +785,12 @@ namespace Piot.Yaml
 
 		private void Indent()
 		{
-			if(targetList != null && targetContainer == null)
+			if(targetList != null)
 			{
 				// Ignore first indent
-				Console.WriteLine($"Ignore first indent in list");
 				return;
 			}
 
-			Console.WriteLine($"Indent() with push");
 			Push();
 
 			if(referenceFieldOrProperty != null)
@@ -861,7 +805,6 @@ namespace Piot.Yaml
 
 		private void SetIndentation()
 		{
-			Console.WriteLine($"moving from {currentIndent} to {lastDetectedIndent} indent");
 			if(lastDetectedIndent == currentIndent + 1)
 			{
 				Indent();
@@ -880,17 +823,15 @@ namespace Piot.Yaml
 
 		public T Parse<T>(string testData)
 		{
+			//var root = (T)FormatterServices.GetUninitializedObject(typeof(T));
 			var rootObject = (T)Activator.CreateInstance(typeof(T));
 			targetContainer = new StructOrClassContainer(rootObject);
 			referenceFieldOrProperty = null;
-
-			//var root = (T)FormatterServices.GetUninitializedObject(typeof(T));
 
 			var list = FindMatches(testData);
 
 			foreach (var item in list)
 			{
-				Console.WriteLine($"parsing '{item.groupName}' {item.value}");
 				switch (item.groupName)
 				{
 					case "variable":
@@ -922,7 +863,6 @@ namespace Piot.Yaml
 							s = s.Substring(1, s.Length - 2);
 						}
 
-
 						SetStringValue(s);
 						break;
 					case "float":
@@ -933,13 +873,10 @@ namespace Piot.Yaml
 						break;
 					case "indent":
 						lastDetectedIndent = (item.value.Length - 1) / 2;
-						Console.WriteLine($"detected indent {lastDetectedIndent}");
 						break;
 					case "indentspaces":
 						break;
 					case "hyphen":
-
-
 						ParseHyphen();
 						break;
 					case "comment":
