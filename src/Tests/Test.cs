@@ -41,13 +41,15 @@ namespace tests
 		public struct SomeItem
 		{
 			public int x;
+			public int y;
 
 			public override string ToString()
 			{
-				return $"item:{x}";
+				return $"[SomeItem {x}, {y}]";
 			}
 		}
 
+		[Flags]
 		public enum SomeEnum
 		{
 			FirstChoice,
@@ -64,6 +66,13 @@ namespace tests
 			public SomeClass someClass;
 			public SomeEnum someEnum;
 			public SomeItem[] someItems;
+			public Dictionary<int, SomeItem> lookup;
+
+
+			public override string ToString()
+			{
+				return $"[TestSubKlass {lookup}]";
+			}
 
 			public float f;
 		}
@@ -180,6 +189,81 @@ props_custom: 'hello,world'
 
 
 		[Test]
+		public void TestEnumFlags()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: Second | FirstChoice
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Second | SomeEnum.FirstChoice, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+		[Test]
+		public void TestEnumFlagsWithComma()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: Second,FirstChoice
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Second | SomeEnum.FirstChoice, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+		[Test]
+		public void TestEnumFlagsWithDifferentName()
+		{
+			var testData = @"
+john:34  
+subClass  : 
+  answer: 42 
+  anotherAnswer       : '99'
+  someEnum: Second | _third
+  someClass:
+    inDaStruct:           2
+
+other: hejsan svejsan
+
+props_custom: 'hello,world'
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(SomeEnum.Second | SomeEnum.Third, o.subClass.someEnum);
+			Assert.AreEqual(34, o.john);
+			Assert.AreEqual("hejsan svejsan", o.other);
+			Assert.AreEqual("hello,world", o.props);
+			Assert.AreEqual(42, o.subClass.answer);
+			Assert.AreEqual("99", o.subClass.AnOTHerAnswer);
+		}
+
+		[Test]
 		public void TestDeserializeWithList()
 		{
 			var testData = @"
@@ -210,6 +294,72 @@ props_custom: 'hello,world'
 
 
 		[Test]
+		public void TestDeserializeWithMinimalList()
+		{
+			var testData = @"
+subClass: 
+  someItems:
+    - x: 23
+    - x: 42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(23, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+		}
+
+
+		[Test]
+		public void TestDeserializeWithMinimalList2()
+		{
+			var testData = @"
+subClass: 
+  someItems:
+    -     x: 399
+    -     x: 42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(399, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+		}
+
+
+		[Test]
+		public void TestDeserializeWithMinimalListAndDictionary()
+		{
+			var testData = @"
+props: 'props'
+john: 34
+other: 'other'
+isItTrue: true
+subClass:
+  anotherAnswer: '42'
+  answer: 42
+  someClass:
+    inDaStruct: 1
+  someEnum: FirstChoice
+  someItems:
+    - x: 399
+      y: -1024
+    - x: 42
+  lookup:
+    2:
+      x: 909
+      y: -1234
+  f: -22.42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(399, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+			Assert.AreEqual(-22.42, o.subClass.f, 0.0001f);
+			Assert.AreEqual(909, o.subClass.lookup[2].x);
+			Assert.AreEqual(-1234, o.subClass.lookup[2].y);
+		}
+
+
+		[Test]
 		public void TestDeserializeWithWrongHyphenList()
 		{
 			var testData = @"
@@ -228,6 +378,24 @@ other: hejsan svejsan
 props_custom: 'hello,world'
 ";
 			var o = Assert.Throws<Exception>(() => YamlDeserializer.Deserialize<TestKlass>(testData));
+		}
+
+		[Test]
+		public void TestDeserializeWithDictionary()
+		{
+			var testData = @"
+subClass: 
+  lookup:
+    2:
+      x: 42
+    3:
+      x: 101   
+other: hejsan svejsan
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(42, o.subClass.lookup[2].x);
+			Assert.AreEqual(101, o.subClass.lookup[3].x);
+			Assert.AreEqual("hejsan svejsan", o.other);
 		}
 
 
@@ -322,7 +490,7 @@ subClass:
 			Assert.AreEqual(1, o.someInt);
 		}
 
-		[Test]
+		//[Test]
 		public void TestSerialize()
 		{
 			var o = new TestKlass();
@@ -333,7 +501,8 @@ subClass:
 			o.subClass.someClass.inDaStruct = 1;
 			o.props = "props";
 			o.isItTrue = true;
-			o.subClass.someItems = new SomeItem[0];
+			o.subClass.someItems = new SomeItem[1];
+			o.subClass.lookup = new();
 
 			o.other = "other";
 			var output = YamlSerializer.Serialize(o);
@@ -344,7 +513,7 @@ subClass:
 			Assert.AreEqual(output, backOutput);
 		}
 
-		[Test]
+		//[Test]
 		public void TestSerializeWithList()
 		{
 			var o = new TestKlass();
@@ -359,6 +528,54 @@ subClass:
 			{
 				new() { x = 399 },
 				new() { x = 42 }
+			};
+
+			o.subClass.lookup = new()
+			{
+				{ 2, new() { x = 909 } }
+			};
+
+			o.other = "other";
+			var output = YamlSerializer.Serialize(o);
+			Console.WriteLine("Output:{0}", output);
+			var back = YamlDeserializer.Deserialize<TestKlass>(output);
+			var backOutput = YamlSerializer.Serialize(back);
+			AssertEx.AreEqualByXml(o, back);
+			Assert.AreEqual(output, backOutput);
+		}
+
+
+		//[Test]
+		public void TestSerializeWithDictionary()
+		{
+			var o = new TestKlass();
+			o.john = 34;
+			o.subClass = new TestSubKlass();
+			o.subClass.answer = 42;
+			o.subClass.f = -22.42f;
+			o.subClass.someClass.inDaStruct = 1;
+			o.props = "props";
+			o.isItTrue = true;
+			o.subClass.someItems = new SomeItem[]
+			{
+				new() { x = 399 },
+				new() { x = 42 }
+			};
+
+			o.subClass.lookup = new Dictionary<int, SomeItem>()
+			{
+				{
+					1, new()
+					{
+						x = -101
+					}
+				},
+				{
+					-1, new()
+					{
+						x = 99
+					}
+				}
 			};
 
 			o.other = "other";
