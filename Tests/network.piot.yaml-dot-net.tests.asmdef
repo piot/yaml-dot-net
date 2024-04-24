@@ -1,0 +1,12 @@
+{
+  "name": "network.piot.yaml-dot-net.tests",
+  "references": [
+    "network.piot.yaml-dot-net"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "precompiledReferences": [
+    "nunit.framework.dll"
+  ]
+}

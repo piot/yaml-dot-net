@@ -3,3 +3,9 @@ obj/
 *.userprefs
 src/.idea/.idea.Piot.Yaml/.idea
 src/Piot.Yaml.sln.DotSettings.user
+network.piot.yaml-dot-net-0.0.1.tgz
+network.piot.yaml-dot-net-0.0.1.tgz.meta
+diff.txt
+diff.txt.meta
+Tests/bin.meta
+Tests/obj.meta

@@ -1,0 +1,13 @@
+diff.txt
+diff.txt.meta
+*.sln
+*.csproj
+*.user
+bin/
+obj/
+*.user.meta
+*.csproj.meta
+*.sln.meta
+bin.meta
+obj.meta
+*.tgz*

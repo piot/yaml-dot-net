@@ -1,0 +1,13 @@
+{
+  "name": "network.piot.yaml-dot-net",
+  "version": "0.0.1",
+  "displayName": "YamlDotNet",
+  "description": "Basic Yaml parser for .NET",
+  "unity": "2022.3",
+  "author": {
+    "name": "Peter Bjorklund",
+    "email": "piot@hotmail.com",
+    "url": "https://github.com/piot/yaml-dot-net"
+  },
+  "license": "MIT"
+}
