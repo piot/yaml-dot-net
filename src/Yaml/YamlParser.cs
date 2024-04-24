@@ -655,6 +655,7 @@ namespace Piot.Yaml
 
 		void ParseHyphen()
 		{
+			Console.WriteLine("parse hyphen");
 			// The hyphen and space should be ignored when it comes to the lastDetectedIndent, so just increase it
 			lastDetectedIndent++;
 
@@ -665,6 +666,7 @@ namespace Piot.Yaml
 
 			if(targetContainer != null)
 			{
+				// We were working on a container object, add that to the list
 				targetList.Add(targetContainer.ContainerObject);
 				if(lastDetectedIndent != currentIndent)
 				{
@@ -674,11 +676,16 @@ namespace Piot.Yaml
 				targetContainer = null;
 			}
 			else
-			{
-				if(lastDetectedIndent != currentIndent + 1)
+			{	
+				if(lastDetectedIndent != currentIndent + 1 && lastDetectedIndent != currentIndent)
 				{
 					throw new Exception($"wrong hyphen indent {lastDetectedIndent} {currentIndent}");
 				}
+			}
+
+			if(targetList.ItemType.IsPrimitive)
+			{
+				return;
 			}
 
 			targetContainer =
@@ -720,6 +727,10 @@ namespace Piot.Yaml
 			if(referenceFieldOrProperty != null)
 			{
 				SetValue(v);
+			}
+			else if(targetList is not null)
+			{
+				targetList.Add(v);
 			}
 			else if(targetContainer != null)
 			{

@@ -67,6 +67,7 @@ namespace tests
 			public SomeEnum someEnum;
 			public SomeItem[] someItems;
 			public Dictionary<int, SomeItem> lookup;
+			public int[] integers;
 
 
 			public override string ToString()
@@ -325,6 +326,37 @@ subClass:
 		}
 
 
+		[Test]
+		public void TestDeserializeWithMinimalListNoIndent()
+		{
+			var testData = @"
+subClass: 
+  someItems:
+  - x: 399
+  - x: 42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.someItems.Length);
+			Assert.AreEqual(399, o.subClass.someItems[0].x);
+			Assert.AreEqual(42, o.subClass.someItems[1].x);
+		}
+		
+		[Test]
+		public void TestDeserializeWithMinimalIntegerListNoIndent()
+		{
+			var testData = @"
+subClass: 
+  integers:
+    - 399
+    - 42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.integers.Length);
+			Assert.AreEqual(399, o.subClass.integers[0]);
+			Assert.AreEqual(42, o.subClass.integers[1]);
+		}
+		
+		
 		[Test]
 		public void TestDeserializeWithMinimalListAndDictionary()
 		{
