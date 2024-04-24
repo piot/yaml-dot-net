@@ -1,7 +1,7 @@
-/*---------------------------------------------------------------------------------------------
+/*----------------------------------------------------------------------------------------------------------
  *  Copyright (c) Peter Bjorklund. All rights reserved. https://github.com/piot/yaml-dot-net
  *  Licensed under the MIT License. See LICENSE in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
+ *--------------------------------------------------------------------------------------------------------*/
 
 using System;
 using Piot.Yaml;
@@ -342,7 +342,7 @@ subClass:
 		}
 		
 		[Test]
-		public void TestDeserializeWithMinimalIntegerListNoIndent()
+		public void TestDeserializeWithMinimalIntegerListIndent()
 		{
 			var testData = @"
 subClass: 
@@ -356,6 +356,21 @@ subClass:
 			Assert.AreEqual(42, o.subClass.integers[1]);
 		}
 		
+		[Test]
+		public void TestDeserializeWithMinimalIntegerListNoIndent()
+		{
+			var testData = @"
+subClass: 
+  integers:
+  - 399
+  - -42
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.AreEqual(2, o.subClass.integers.Length);
+			Assert.AreEqual(399, o.subClass.integers[0]);
+			Assert.AreEqual(-42, o.subClass.integers[1]);
+		}
+
 		
 		[Test]
 		public void TestDeserializeWithMinimalListAndDictionary()
@@ -400,8 +415,8 @@ subClass  :
   answer: 42 
   anotherAnswer       : '99'
   someItems:
-  - x: 23
-  - x: 42
+ - x: 23
+ - x: 42
   someClass:
     inDaStruct:           2
 
