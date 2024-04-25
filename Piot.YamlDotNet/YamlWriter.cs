@@ -141,9 +141,6 @@ namespace Piot.Yaml
 
 			var t = o.GetType();
 
-			Console.WriteLine($"writing object of type {t.Name} isDictionary: {IsDictionary(t)}");
-
-
 			if(t.IsArray)
 			{
 				WriteArray(o, writer, indent);

@@ -300,8 +300,8 @@ props_custom: 'hello,world'
 			var testData = @"
 subClass: 
   someItems:
-    - x: 23
-    - x: 42
+  - x: 23
+  - x: 42
 ";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual(2, o.subClass.someItems.Length);
@@ -340,7 +340,7 @@ subClass:
 			Assert.AreEqual(399, o.subClass.someItems[0].x);
 			Assert.AreEqual(42, o.subClass.someItems[1].x);
 		}
-		
+
 		[Test]
 		public void TestDeserializeWithMinimalIntegerListIndent()
 		{
@@ -355,15 +355,60 @@ subClass:
 			Assert.AreEqual(399, o.subClass.integers[0]);
 			Assert.AreEqual(42, o.subClass.integers[1]);
 		}
-		
+
+		public struct BoatCollection
+		{
+			public Boat[] boats;
+		}
+
+		public struct Boat
+		{
+			public string id;
+			public string description;
+
+			public Seat[] seats;
+		}
+
+
+		public struct Seat
+		{
+			public string id;
+		}
+
+
+		[Test]
+		public void TestDeserializeWithMinimalIntegerSubTask()
+		{
+			var testData = @"
+boats:
+  - id: firstBoat
+    description: 'This is an interesting boat'
+    seats:
+    - id: seat1
+    - id: seat2
+    - id: seat3
+
+  - id: anotherBoat
+    seats:
+      - id: seatb1
+      - id: seatb2
+      - id: seatb3
+";
+			var o = YamlDeserializer.Deserialize<BoatCollection>(testData);
+			Assert.AreEqual(2, o.boats.Length);
+			Assert.AreEqual("seat1", o.boats[0].seats[0].id);
+			Assert.AreEqual("seat2", o.boats[0].seats[1].id);
+			Assert.AreEqual("seatb3", o.boats[1].seats[2].id);
+		}
+
 		[Test]
 		public void TestDeserializeWithMinimalIntegerListNoIndent()
 		{
 			var testData = @"
 subClass: 
   integers:
-  - 399
-  - -42
+    - 399
+    - -42
 ";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
 			Assert.AreEqual(2, o.subClass.integers.Length);
@@ -371,7 +416,7 @@ subClass:
 			Assert.AreEqual(-42, o.subClass.integers[1]);
 		}
 
-		
+
 		[Test]
 		public void TestDeserializeWithMinimalListAndDictionary()
 		{
@@ -424,7 +469,7 @@ other: hejsan svejsan
 
 props_custom: 'hello,world'
 ";
-			var o = Assert.Throws<Exception>(() => YamlDeserializer.Deserialize<TestKlass>(testData));
+			var o = Assert.Throws<IndentationException>(() => YamlDeserializer.Deserialize<TestKlass>(testData));
 		}
 
 		[Test]
@@ -500,7 +545,7 @@ subClass:
 		{
 			var testData = "someInt: 0xffa800\n  ";
 			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
-			Assert.AreEqual(16754688, o.someInt);
+			Assert.AreEqual(0xffa800, o.someInt);
 		}
 
 		[Test]
