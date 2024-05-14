@@ -347,13 +347,21 @@ subClass:
 			var testData = @"
 subClass: 
   integers:
+    - 0
+    - 00
+    - 10
+    - -20
     - 399
     - 42
 ";
 			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
-			Assert.AreEqual(2, o.subClass.integers.Length);
-			Assert.AreEqual(399, o.subClass.integers[0]);
-			Assert.AreEqual(42, o.subClass.integers[1]);
+			Assert.AreEqual(6, o.subClass.integers.Length);
+			Assert.AreEqual(0, o.subClass.integers[0]);
+			Assert.AreEqual(0, o.subClass.integers[1]);
+			Assert.AreEqual(10, o.subClass.integers[2]);
+			Assert.AreEqual(-20, o.subClass.integers[3]);
+			Assert.AreEqual(399, o.subClass.integers[4]);
+			Assert.AreEqual(42, o.subClass.integers[5]);
 		}
 
 		public struct BoatCollection

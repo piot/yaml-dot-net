@@ -18,9 +18,9 @@ namespace Piot.Yaml
 			var variable = @"(?<variable>[a-zA-Z0-9_$]*\s*:)";
 			var hyphen = @"(?<hyphen>- \s*)";
 			var stringMatch = @"(?<string>.*)";
-			var integerMatch = @"(?<integer>\s*[-+]?[1-9]\d*)";
+			var integerMatch = @"(?<integer>\s*-?\d+)";
 			var hexMatch = @"(?<hex>\s*0[xX][0-9a-fA-F]*)";
-			var floatMatch = @"(?<float>\s*[-+]?[0-9]*\.[0-9]+(?<exponent>[eE][-+]?[0-9]+)?)";
+			var floatMatch = @"(?<float>\s*-?\d+\.\d+)";
 			var booleanMatch = @"(?<boolean>(true)|(false))";
 			var commentMatch = @"(?<comment>\s*\#.+)";
 
