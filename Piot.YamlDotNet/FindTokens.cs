@@ -15,13 +15,13 @@ namespace Piot.Yaml
 		{
 			var outList = new List<YamlMatch>();
 
-			var variable = @"(?<variable>[a-zA-Z0-9_$]*\s*:)";
+			var variable = @"(?<variable>[a-zA-Z0-9_$]+\s*:)";
 			var hyphen = @"(?<hyphen>- \s*)";
 			var stringMatch = @"(?<string>.*)";
 			var integerMatch = @"(?<integer>\s*-?\d+)";
-			var hexMatch = @"(?<hex>\s*0[xX][0-9a-fA-F]*)";
+			var hexMatch = @"(?<hex>\s*0[xX][0-9a-fA-F]+)";
 			var floatMatch = @"(?<float>\s*-?\d+\.\d+)";
-			var booleanMatch = @"(?<boolean>(true)|(false))";
+			var booleanMatch = @"(?<boolean>(true|false))";
 			var commentMatch = @"(?<comment>\s*\#.+)";
 
 			var expressions = new[]
