@@ -94,6 +94,12 @@ namespace tests
 			public uint someInt;
 			public int somethingElse;
 		}
+		
+		public struct TestFloatKlass
+		{
+			public float someFloat;
+			public float[] floatList;
+		}
 
 		public class TestStandaloneIntKlass
 		{
@@ -460,6 +466,16 @@ subClass:
 
 
 		[Test]
+		public void TestFalse()
+		{
+			var testData = @"
+isItTrue: false
+";
+			var o = YamlDeserializer.Deserialize<TestKlass>(testData);
+			Assert.IsFalse(o.isItTrue);
+		}
+		
+		[Test]
 		public void TestDeserializeWithWrongHyphenList()
 		{
 			var testData = @"
@@ -580,6 +596,22 @@ subClass:
 			var o = YamlDeserializer.Deserialize<TestIntKlass>(testData);
 			Assert.AreEqual(1, o.someInt);
 			Assert.AreEqual(5, o.somethingElse);
+		}
+		
+		[Test]
+		public void TestFloat()
+		{
+			var testData = @"
+someFloat: -1.4
+floatList:
+  - 2.0
+  - -25.50
+";
+			var o = YamlDeserializer.Deserialize<TestFloatKlass>(testData);
+			Assert.AreEqual((float)-1.4, o.someFloat);
+			Assert.AreEqual(2, o.floatList.Length);
+			Assert.AreEqual(2.0, o.floatList[0]);
+			Assert.AreEqual(-25.50, o.floatList[1]);
 		}
 
 		[Test]

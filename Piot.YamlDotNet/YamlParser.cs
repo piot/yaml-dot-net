@@ -5,6 +5,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Piot.Yaml
 {
@@ -102,7 +103,23 @@ namespace Piot.Yaml
 
 		void SetValue(object v)
 		{
-			referenceFieldOrProperty.SetValue(v);
+			if(referenceFieldOrProperty != null)
+			{
+				referenceFieldOrProperty.SetValue(v);
+			}
+			else if(targetList is not null)
+			{
+				targetList.Add(v);
+			}
+			else if(targetContainer != null)
+			{
+				object o = v;
+				SetReferenceToPropertyName(o);
+			}
+			else
+			{
+				throw new Exception($"could not set value {v}");
+			}
 		}
 
 		void FinalizePreviousItemInListOnSameLevel()
@@ -176,25 +193,11 @@ namespace Piot.Yaml
 			}
 		}
 
+
+
 		void SetIntegerValue(int v)
 		{
-			if(referenceFieldOrProperty != null)
-			{
-				SetValue(v);
-			}
-			else if(targetList is not null)
-			{
-				targetList.Add(v);
-			}
-			else if(targetContainer != null)
-			{
-				object o = v;
-				SetReferenceToPropertyName(o);
-			}
-			else
-			{
-				throw new Exception($"unexpected integer {v}");
-			}
+			SetValue(v);
 		}
 
 		void SetUnsignedIntegerValue(ulong v)
@@ -202,6 +205,16 @@ namespace Piot.Yaml
 			SetValue(v);
 		}
 
+		void SetFloatValue(float v)
+		{
+			SetValue(v);
+		}
+
+		
+		void SetBooleanValue(bool v)
+		{
+			SetValue(v);
+		}
 
 		private IContainerObject ContainerObject => targetList != null
 			? targetList
@@ -332,7 +345,7 @@ namespace Piot.Yaml
 					SetReferenceToPropertyName(item.value.Substring(0, item.value.Length - 1).Trim());
 					break;
 				case "integer":
-					var integerValue = int.Parse(item.value);
+					var integerValue = int.Parse(item.value, CultureInfo.InvariantCulture);
 					SetIntegerValue(integerValue);
 					break;
 				case "hex":
@@ -355,10 +368,11 @@ namespace Piot.Yaml
 					SetStringValue(s);
 					break;
 				case "float":
-					SetValue(item.value);
+					var floatValue = float.Parse(item.value.Trim(), CultureInfo.InvariantCulture);
+					SetFloatValue(floatValue);
 					break;
 				case "boolean":
-					SetValue(item.value == "true");
+					SetBooleanValue(item.value == "true");
 					break;
 				case "indentspaces":
 					break;
