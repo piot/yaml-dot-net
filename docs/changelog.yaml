@@ -1,7 +1,7 @@
 repo: piot/yaml-dot-net
 
 releases:
-  'v0.0.3':
+  'v0.0.4':
     date: '2024-05-15'
     notice: |
 

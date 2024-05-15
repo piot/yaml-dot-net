@@ -1,6 +1,6 @@
 # Changelog
 
-## :bookmark: [v0.0.3](https://github.com/piot/yaml-dot-net/releases/tag/v0.0.3) (2024-05-15)
+## :bookmark: [v0.0.4](https://github.com/piot/yaml-dot-net/releases/tag/v0.0.4) (2024-05-15)
 
 
 

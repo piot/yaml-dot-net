@@ -11,3 +11,4 @@ obj/
 bin.meta
 obj.meta
 *.tgz*
+docs/*.yaml
