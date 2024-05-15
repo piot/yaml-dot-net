@@ -1,0 +1,14 @@
+repo: piot/yaml-dot-net
+
+releases:
+  'v0.0.3':
+    date: '2024-05-15'
+    notice: |
+
+    sections:
+      general:
+        changes:
+          fixed:
+          - can parse integers that contains a zero '0' ($0df497ad)
+          - floats can now be used in lists ($08f28d3a)
+
