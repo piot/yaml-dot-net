@@ -1,6 +1,6 @@
 {
   "name": "network.piot.yaml-dot-net",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "displayName": "YamlDotNet",
   "description": "Basic Yaml parser for .NET",
   "unity": "2022.3",
